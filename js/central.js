@@ -47,14 +47,16 @@ const modeloTabela = (colunas, base, btnExtras) => {
     return `
     <div class="blocoTabela">
         <div class="painelBotoes">
+
             <div class="botoes">
                 <div class="pesquisa">
                     <input oninput="pesquisar(this, 'body')" placeholder="Pesquisar" style="width: 100%;">
                     <img src="imagens/pesquisar2.png">
                 </div>
                 ${btnExtras || ''}
+                <img class="atualizar" src="imagens/atualizar.png" onclick="atualizarDados('${base}')">
             </div>
-            <img class="atualizar" src="imagens/atualizar.png" onclick="atualizarDados('${base}')">
+            
         </div>
         <div class="recorteTabela">
             <table class="tabela">
@@ -367,10 +369,10 @@ async function telaPrincipal() {
 
             ${btn('atualizar', 'Atualizar', 'atualizarApp()')}
             ${btn('agenda', 'Agenda', '')}
-            ${btn('professor', 'Professores', '')}
-            ${btn('disciplina', 'Disciplinas', '')}
-            ${btn('perfil', 'Usuários', 'usuarios()')}
-            ${btn('configuracoes', 'Configurações', 'telaConfiguracoes()')}
+            ${btn('professor', 'Professores', 'telaProfessores()')}
+            ${btn('disciplina', 'Disciplinas', 'telaDisciplinas()')}
+            ${btn('turmas', 'Turmas', 'telaTurmas()')}
+            ${btn('perfil', 'Usuários', 'telaUsuarios()')}
             ${btn('sair', 'Desconectar', 'deslogar()')}
 
         </div>
@@ -526,7 +528,7 @@ function verificarClique(event) {
     if (menu && menu.classList.contains('active') && !menu.contains(event.target)) menu.classList.remove('active')
 }
 
-async function usuarios() {
+async function telaUsuarios() {
 
     mostrarMenus()
 
@@ -538,8 +540,28 @@ async function usuarios() {
     telaInterna.innerHTML = acumulado
 
     const dados_setores = await recuperarDados(nomeBase)
-    for (const [id, usuario] of Object.entries(dados_setores).reverse()) criarLinha(usuario, id, nomeBase)
+    for (const [usuario, dados] of Object.entries(dados_setores).reverse()) {
+        criarLinhaUsuarios(usuario, dados)
+    }
 
+}
+
+function criarLinhaUsuarios(usuario, dados) {
+
+    const tds = `
+        <td>${dados.nome_completo}</td>
+        <td>${usuario}</td>
+        <td>${dados?.setor || ''}</td>
+        <td>${dados?.permissao || ''}</td>
+        <td>
+            <img onclick="gerenciarUsuario('${usuario}')" src="imagens/pesquisar.png" style="width: 2rem;">
+        </td>
+    `
+
+    const trExistente = document.getElementById(usuario)
+    if (trExistente) return trExistente.innerHTML = tds
+
+    document.getElementById('body').insertAdjacentHTML('beforeend', `<tr id="${usuario}">${tds}</tr>`)
 }
 
 async function sincronizarDados(base, overlayOff) {
@@ -558,7 +580,18 @@ async function atualizarDados(base) {
     await sincronizarDados(base)
 
     const dados = await recuperarDados(base)
-    for (const [id, objeto] of Object.entries(dados).reverse()) criarLinha(objeto, id, base)
+    for (const [id, objeto] of Object.entries(dados).reverse()) {
+
+        if (base == 'dados_setores') {
+            criarLinhaUsuarios(id, objeto)
+        }
+
+        if (base == 'dados_setores') {
+            criarLinhaProfessores(id, objeto)
+        }
+
+    }
+
     removerOverlay()
 
 }
@@ -592,11 +625,11 @@ async function gerenciarUsuario(id) {
     const permissoes = ['', 'novo', 'adm', 'user', 'analista']
         .map(op => `<option ${usuario?.permissao == op ? 'selected' : ''}>${op}</option>`).join('')
 
-    const setores = ['', 'SUPORTE', 'GESTÃO', 'LOGÍSTICA']
+    const setores = ['', 'SUPORTE', 'COORDENAÇÃO', 'PROFESSOR(A)', 'ADMINISTRATIVO', 'DIREÇÃO']
         .map(op => `<option ${usuario?.setor == op ? 'selected' : ''}>${op}</option>`).join('')
 
     const acumulado = `
-        <div style="${vertical}; gap: 5px; padding: 2vw; background-color: #d2d2d2;">
+        <div style="${vertical}; min-width: 30vw; gap: 5px; padding: 2vw; background-color: #d2d2d2;">
             ${modelo('Nome', usuario?.nome_completo || '--')}
             ${modelo('E-mail', usuario?.email || '--')}
             ${modelo('Permissão', `<select onchange="configuracoes('${id}', 'permissao', this.value)">${permissoes}</select>`)}
@@ -702,15 +735,18 @@ function enviar(caminho, info) {
     });
 }
 
-function erroConexao() {
+function erroConexao(msg) {
     const acumulado = `
         <div id="erroConexao" style="${horizontal}; gap: 1rem; background-color: #d2d2d2; padding: 1rem;">
             <img src="gifs/alerta.gif" style="width: 2rem;">
-            <span><b>Dados não sincronizados:</b> tente novamente em minutos.</span>
+            <span id="msgErro"><b>Dados não sincronizados:</b> tente novamente em minutos.</span>
         </div>
     `
     const erroConexao = document.getElementById('erroConexao')
     if (!erroConexao) popup(acumulado, 'Sincronização', true)
+
+    const msgErro = document.getElementById('msgErro')
+    if (msgErro) msgErro.textContent = msg
 
     sincronizarApp({ remover: true })
     emAtualizacao = false
@@ -750,25 +786,29 @@ async function receber(chave) {
                 return response.json();
             })
             .then(data => {
+                if (data.mensagem) {
+                    erroConexao(data.mensagem)
+                    reject({ err: data.mensagem })
+                }
                 resolve(data)
             })
             .catch(err => {
-                erroConexao()
-                resolve({})
+                erroConexao(err)
+                reject({ err })
             });
     })
 }
 
-async function deletar(chave) {
+async function deletar(caminho) {
     const url = `${api}/deletar`;
     const acesso = JSON.parse(localStorage.getItem('acesso'))
     const objeto = {
-        chave,
+        caminho,
         usuario: acesso.usuario,
         servidor
     }
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         fetch(url, {
             method: "POST",
             headers: {
@@ -778,12 +818,15 @@ async function deletar(chave) {
         })
             .then(response => response.json())
             .then(data => {
-                resolve(data);
+                if (data.mensagem) {
+                    erroConexao(data.mensagem)
+                    reject({ err: data.mensagem })
+                }
+                resolve(data)
             })
             .catch((err) => {
-                salvarOffline(objeto, 'deletar', idEvento);
-                popup(mensagem(err), 'Aviso', true)
-                resolve();
+                erroConexao({ err })
+                reject()
             });
     });
 }
@@ -858,11 +901,19 @@ function inicialMaiuscula(string) {
 
 async function configuracoes(usuario, campo, valor) {
 
-    let dados_usuario = await recuperarDado('dados_setores', usuario)
-    dados_usuario[campo] = valor
-    await inserirDados({ [usuario]: dados_usuario }, 'dados_setores')
-    criarLinha(dados_usuario, usuario, 'dados_setores')
+    const resposta = await alterarUsuarios({ usuario, campo, valor })
 
+    if (!resposta.err) {
+
+        let dadosUsuario = await recuperarDado('dados_setores', usuario)
+        dadosUsuario[campo] = valor
+        await inserirDados({ [usuario]: dadosUsuario }, 'dados_setores')
+        criarLinhaUsuarios(usuario, dadosUsuario)
+
+    }
+}
+
+async function alterarUsuarios({ usuario, campo, valor }) {
     return new Promise((resolve, reject) => {
         fetch(`${api}/configuracoes`, {
             method: "POST",
@@ -876,13 +927,18 @@ async function configuracoes(usuario, campo, valor) {
                 return response.json();
             })
             .then(data => {
-                resolve(data);
+                if (data.mensagem) {
+                    erroConexao(data.mensagem)
+                    reject({ err: data.mensagem })
+                }
+                resolve(data)
             })
             .catch(err => {
                 console.log(err)
-                reject()
-            });
+                reject({ err })
+            })
     })
+
 }
 
 function porcentagemHtml(valor) {
@@ -1091,5 +1147,78 @@ async function reprocessarOffline() {
             }
 
         }
+    }
+}
+
+async function cxOpcoes(name, nomeBase, campos, funcaoAux) {
+
+    let base = await recuperarDados(nomeBase)
+    let opcoesDiv = ''
+
+    for (const [cod, dado] of Object.entries(base)) {
+
+        if (dado.origem && origem !== dado?.origem) continue
+
+        const labels = campos
+            .map(campo => `${(dado[campo] && dado[campo] !== '') ? `<label>${dado[campo]}</label>` : ''}`)
+            .join('')
+
+        const descricao = String(dado[campos[0]])
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-zA-Z0-9 ]/g, '')
+
+        opcoesDiv += `
+            <div 
+                name="camposOpcoes" 
+                class="atalhos-opcoes" 
+                onclick="selecionar('${name}', '${cod}', '${descricao}', ${funcaoAux ? `'${funcaoAux}'` : false})">
+                <img src="${dado.imagem || 'imagens/professor.png'}" style="width: 3rem;">
+                <div style="${vertical}; gap: 2px;">
+                    ${labels}
+                </div>
+            </div>`
+    }
+
+    const acumulado = `
+        <div style="${vertical}; justify-content: left; background-color: #b1b1b1;">
+
+            <div style="${horizontal}; padding-left: 0.5rem; padding-right: 0.5rem; margin: 5px; background-color: white; border-radius: 10px;">
+                <input oninput="pesquisarCX(this)" placeholder="Pesquisar itens" style="border: none; width: 100%;">
+                <img src="imagens/pesquisar2.png" style="width: 2rem; padding: 0.5rem;"> 
+            </div>
+
+            <div style="padding: 1rem; gap: 5px; ${vertical}; background-color: #d2d2d2; width: 30vw; max-height: 40vh; height: max-content; overflow-y: auto; overflow-x: hidden;">
+                ${opcoesDiv}
+            </div>
+
+        </div>
+    `
+
+    popup(acumulado, 'Selecione o item', true)
+
+}
+
+async function selecionar(name, id, termo, funcaoAux) {
+    const elemento = document.querySelector(`[name='${name}']`)
+    elemento.textContent = termo
+    elemento.id = id
+    removerPopup()
+
+    if (funcaoAux) await eval(funcaoAux)
+}
+
+function pesquisarCX(input) {
+    const termoPesquisa = String(input.value)
+        .toLowerCase()
+        .replace(/[./-]/g, ''); // remove ponto, traço e barra
+
+    const divs = document.querySelectorAll(`[name='camposOpcoes']`);
+
+    for (const div of divs) {
+        const termoDiv = String(div.textContent)
+            .toLowerCase()
+            .replace(/[./-]/g, ''); // mesma limpeza no conteúdo
+
+        div.style.display = (termoDiv.includes(termoPesquisa) || termoPesquisa === '') ? '' : 'none';
     }
 }

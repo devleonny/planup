@@ -95,11 +95,13 @@ async function gerenciarProfessor(input, idProfessor, idDisciplina) {
 
     if (input.checked) {
         disciplina.professores[idProfessor] = {}
+        enviar(`disciplinas/${idDisciplina}/professores/${idProfessor}`, true)
     } else {
         delete disciplina.professores[idProfessor]
+        deletar(`disciplinas/${idDisciplina}/professores/${idProfessor}`)
     }
 
-    enviar(`disciplinas/${idDisciplina}/professores/${idProfessor}`, {})
+
     await inserirDados({ [idDisciplina]: disciplina }, 'disciplinas')
 
 }

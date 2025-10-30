@@ -86,6 +86,10 @@ async function planoAulas(idTurma) {
     <div id="planoAulas" class="contorno-dias" style="flex-direction: row; gap: 1rem;">
         ${strTurnos}
     </div>
+    <div class="contorno-dias">
+        <span>Nome da Turma</span>
+        <span style="font-size: 1.2rem;">${turma.nome}</span>
+    </div>
     <button onclick="telaTurmas()">Voltar</button>
     `
     const acumulado = `
@@ -178,7 +182,12 @@ async function atualizarDatas(data, chave, idDisciplina) {
 
     disciplina.turmas[idTurmaAtual][chave] = data
 
-    enviar(`disciplinas/${idDisciplina}/turmas/${idTurmaAtual}/${chave}`, data)
+    if (data) {
+        enviar(`disciplinas/${idDisciplina}/turmas/${idTurmaAtual}/${chave}`, data)
+    } else {
+        deletar(`disciplinas/${idDisciplina}/turmas/${idTurmaAtual}/${chave}`)
+    }
+    
     await inserirDados({ [idDisciplina]: disciplina }, 'disciplinas')
 
     await planoAulas(idTurmaAtual)

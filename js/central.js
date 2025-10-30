@@ -381,7 +381,7 @@ async function telaPrincipal() {
 
         <div class="telaInterna">
             <div class="plano-fundo">
-                <img src="imagens/logo.png" style="width: 20rem">
+                <img src="imagens/logo.png" style="width: 30rem">
             </div>
         </div>
     </div>
@@ -414,6 +414,7 @@ async function atualizarApp() {
 
     for (const base of basesAuxiliares) {
         sincronizarApp(status)
+        await inserirDados({}, base, true) // Resetar
         await sincronizarDados(base, true)
         status.atual++
     }

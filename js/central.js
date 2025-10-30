@@ -37,31 +37,33 @@ const dtFormatada = (data) => {
     return `${dia}/${mes}/${ano}`
 }
 
-const modeloTabela = (colunas, base, btnExtras) => {
+const modeloTabela = ({ colunas, base, btnExtras, body, removerPesquisa }) => {
 
     const ths = colunas
         .map(col => `<th>${col}</th>`).join('')
 
-    const thead = (colunas && colunas.length > 0) ? `<thead>${ths}</thead>` : ''
+    const thead = (colunas && colunas.length > 0) ? `<thead><tr>${ths}</tr></thead>` : ''
 
     return `
     <div class="blocoTabela">
         <div class="painelBotoes">
 
             <div class="botoes">
-                <div class="pesquisa">
-                    <input oninput="pesquisar(this, 'body')" placeholder="Pesquisar" style="width: 100%;">
-                    <img src="imagens/pesquisar2.png">
-                </div>
+                ${removerPesquisa
+            ? ''
+            : `<div class="pesquisa">
+                        <input oninput="pesquisar(this, 'body')" placeholder="Pesquisar" style="width: 100%;">
+                        <img src="imagens/pesquisar2.png">
+                    </div>`}
                 ${btnExtras || ''}
-                <img class="atualizar" src="imagens/atualizar.png" onclick="atualizarDados('${base}')">
+                ${base ? `<img class="atualizar" src="imagens/atualizar.png" onclick="atualizarDados('${base}')">` : ''}
             </div>
             
         </div>
         <div class="recorteTabela">
             <table class="tabela">
                 ${thead}
-                <tbody id="body"></tbody>
+                <tbody id="${body || 'body'}"></tbody>
             </table>
         </div>
         <div class="rodapeTabela"></div>
@@ -401,12 +403,13 @@ async function atualizarApp() {
 
     mostrarMenus(true)
     sincronizarApp()
-    let status = { total: 11, atual: 1 }
+    let status = { total: 5, atual: 1 }
 
     const basesAuxiliares = [
         'professores',
         'disciplinas',
         'agendas',
+        'turmas',
         'dados_setores'
     ];
 
@@ -534,7 +537,7 @@ async function telaUsuarios() {
 
     const nomeBase = 'dados_setores'
     const acumulado = `
-        ${modeloTabela(['Nome', 'Usuário', 'Setor', 'Permissão', ''], nomeBase)}
+        ${modeloTabela({ colunas: ['Nome', 'Usuário', 'Setor', 'Permissão', ''], base: nomeBase })}
     `
     titulo.textContent = 'Gerenciar Usuários'
     telaInterna.innerHTML = acumulado

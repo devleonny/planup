@@ -378,7 +378,6 @@ button {
 
 .recorteTabela {
     height: max-content;
-    max-height: 70vh;
     min-width: 100%;
     max-width: 80vw;
     overflow: auto;
@@ -631,9 +630,27 @@ hr {
     transition: 0.4s;
 }
 
-.contorno-dias {
+.contorno-dias-semana {
+    margin: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
     border-radius: 3px;
-    border: solid 1px solid white;
+    box-shadow: 0px 0px 2px #222;
+    color: white;
+    background-color: #095752;
+    padding: 3px;
+}
+
+.contorno-dias {
+    margin: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    border-radius: 3px;
+    border: solid 1px white;
     background-color: rgba(255, 255, 255, 0.658);
     padding: 3px;
 }
@@ -726,7 +743,6 @@ screen and (min-aspect-ratio: 13/9) {
     }
 
     .recorteTabela {
-        max-height: 50vh;
         max-width: 90vw;
     }
 

@@ -382,7 +382,6 @@ async function telaPrincipal() {
         <div class="telaInterna">
             <div class="plano-fundo">
                 <img src="imagens/logo.png" style="width: 20rem">
-                <p>Seja bem vindo!</p>
             </div>
         </div>
     </div>

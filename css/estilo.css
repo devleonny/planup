@@ -12,6 +12,10 @@ html {
     font-size: 0.9rem;
 }
 
+img {
+    cursor: pointer;
+}
+
 .formulario {
     display: flex;
     align-items: start;

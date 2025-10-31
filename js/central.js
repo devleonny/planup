@@ -537,24 +537,37 @@ async function telaUsuarios() {
 
     const nomeBase = 'dados_setores'
     const acumulado = `
-        ${modeloTabela({ colunas: ['Nome', 'Usuário', 'Setor', 'Permissão', ''], base: nomeBase })}
+        ${modeloTabela({ colunas: ['Nome', 'Usuário', 'Setor', 'Vincular Professor', 'Permissão', ''], base: nomeBase })}
     `
     titulo.textContent = 'Gerenciar Usuários'
     telaInterna.innerHTML = acumulado
 
     const dados_setores = await recuperarDados(nomeBase)
     for (const [usuario, dados] of Object.entries(dados_setores).reverse()) {
-        criarLinhaUsuarios(usuario, dados)
+        await criarLinhaUsuarios(usuario, dados)
     }
 
 }
 
-function criarLinhaUsuarios(usuario, dados) {
+async function criarLinhaUsuarios(usuario, dados) {
 
+    const professor = await recuperarDado('professores', dados?.idProfessor)
+    const idAlet = ID5digitos()
     const tds = `
         <td>${dados.nome_completo}</td>
         <td>${usuario}</td>
         <td>${dados?.setor || ''}</td>
+        <td>
+            ${dados.setor == 'PROFESSOR(A)'
+            ? `<span class="opcoes"
+                ${professor ? `id="${dados.idProfessor}` : ''}
+                name="${idAlet}"
+                data-usuario="${usuario}"
+                onclick="cxOpcoes('${idAlet}', 'professores', ['nome'], 'vincularProfessor(this)')">
+                    ${professor?.nome || 'Selecione'}
+                </span>`
+            : ''}
+        </td>
         <td>${dados?.permissao || ''}</td>
         <td>
             <img onclick="gerenciarUsuario('${usuario}')" src="imagens/pesquisar.png" style="width: 2rem;">
@@ -565,6 +578,17 @@ function criarLinhaUsuarios(usuario, dados) {
     if (trExistente) return trExistente.innerHTML = tds
 
     document.getElementById('body').insertAdjacentHTML('beforeend', `<tr id="${usuario}">${tds}</tr>`)
+}
+
+async function vincularProfessor(span) {
+
+    const usuario = span.dataset.usuario
+    const user = await recuperarDado('dados_setores', usuario)
+
+    user.idProfessor = span.id
+
+    await inserirDados({ [usuario]: user }, 'dados_setores')
+
 }
 
 async function sincronizarDados(base, overlayOff) {

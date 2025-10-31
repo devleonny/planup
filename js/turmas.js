@@ -247,8 +247,8 @@ async function professoresDisponiveis(idDisciplina) {
     let strProfs = ''
     for (const prof of profs) {
         strProfs += `
-        <div class="contorno-dias" style="justify-content: start; flex-direction: row; gap: 1rem; width: 100%;">
-            <input onchange="salvarProfessorDisciplina('${idDisciplina}')" id="${prof}" name="professor" type="radio" style="width: 1.5rem; height: 1.5rem;">
+        <div class="contorno-dias" style="justify-content: start; align-items: center; flex-direction: row; gap: 1rem; width: 100%;">
+            <input onchange="salvarProfessorDisciplina('${idDisciplina}')" id="${prof}" name="professor" type="radio">
             <span>${professores?.[prof]?.nome || prof}</span>
         </div>
         `

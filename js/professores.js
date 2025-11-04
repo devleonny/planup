@@ -5,47 +5,53 @@ async function telaProfessores() {
 
     mostrarMenus()
 
-    const btn = `<button onclick="adicionarProfessor()">Adicionar</button>`
+    const btnExtras = `<button onclick="adicionarProfessor()">Adicionar</button>`
     const nomeBase = 'professores'
     const acumulado = `
-        ${modeloTabela({ colunas: ['Nome', 'Semanal', 'Turno', 'Disciplinas', 'E-mail', 'Contato', ''], base: nomeBase, btnExtras: btn })}
+        ${modeloTabela({ colunas: ['Nome', 'Semanal', 'Turno', 'Disciplinas', 'E-mail', 'Contato', ''], base: nomeBase, btnExtras })}
     `
     titulo.textContent = 'Professores'
     telaInterna.innerHTML = acumulado
 
     const base = await recuperarDados(nomeBase)
     for (const [id, dados] of Object.entries(base).reverse()) {
-        criarLinhaProfessores(id, dados)
+        await criarLinhaProfessores(id, dados)
     }
 
 }
 
-function criarLinhaProfessores(idProfessor, dados) {
+async function criarLinhaProfessores(idProfessor, dados) {
 
-    let strDisp = ''
-    for (const [dia, status] of Object.entries(dados?.dispDias || {})) {
-        if (status) strDisp += `<span class="contorno-dias-semana">${dia}</span>`
-    }
+    const professor = await recuperarDado('professores', idProfessor)
 
-    let strDispTurno = ''
-    for (const [turno, status] of Object.entries(dados?.dispTurnos || {})) {
-        if (status) strDispTurno += `<span class="contorno-dias-semana">${turno}</span>`
-    }
+    const strDias = dias.map(dia => `
+        <div class="contorno-dias">
+            <input onchange="salvarPrefs(this, '${idProfessor}')" data-chave="${dia}" data-objeto="dispDias" type="checkbox" ${professor?.dispDias?.[dia] ? 'checked' : ''}>
+            <span>${dia}</span>
+        </div>
+        `).join('')
+
+    const strTurnos = turnos.map(turno => `
+        <div class="contorno-dias">
+            <input onchange="salvarPrefs(this, '${idProfessor}')" data-chave="${turno}" data-objeto="dispTurnos" type="checkbox" ${professor?.dispTurnos?.[turno] ? 'checked' : ''}>
+            <span>${turno}</span>
+        </div>
+        `).join('')
 
     const tds = `
         <td>${dados?.nome || ''}</td>
         <td>
-            <div style="${horizontal}; gap: 2px;">
-                ${strDisp}
+            <div style="${horizontal}; gap: 1px;">
+                ${strDias}
             </div>
         </td>
         <td>
-            <div style="${horizontal}; gap: 2px;">
-                ${strDispTurno}
+            <div style="${horizontal}; gap: 1px;">
+                ${strTurnos}
             </div>
         </td>
         <td>
-            <img onclick="painelDisciplinas('${idProfessor}')" src="imagens/turmas.png" style="width: 1.8rem;">
+            <img onclick="painelDisciplinas('${idProfessor}')" src="imagens/turmas.png" style="width: 2.3rem;">
         </td>
         <td>${dados?.email || ''}</td>
         <td>${dados?.contato || ''}</td>
@@ -63,7 +69,7 @@ function criarLinhaProfessores(idProfessor, dados) {
 async function painelDisciplinas(idProfessor) {
 
     const acumulado = `
-    <div style="background-color: #d2d2d2; padding; 2rem;">
+    <div style="background-color: #d2d2d2; padding: 2rem;">
         ${modeloTabela({ colunas: ['Nome', 'Selecione'], body: 'body2', removerPesquisa: true })}
     </div>
     `
@@ -220,6 +226,28 @@ async function salvarProfessor(idProfessor) {
 
     removerPopup()
 
+    const divProfs = document.getElementById('divProfs')
+    if (divProfs) {
+        const idDisciplina = divProfs.dataset.disciplina
+        return await professoresDisponiveis(idDisciplina)
+    }
+
     criarLinhaProfessores(idProfessor, professor)
 
+}
+
+async function salvarPrefs(input, idProfessor) {
+    const { objeto, chave } = input.dataset
+    const valor = input.checked
+
+    const professor = await recuperarDado('professores', idProfessor) || {}
+
+    professor[objeto] ??= {}
+    professor[objeto][chave] = valor
+
+    await Promise.all([
+        enviar(`professores/${idProfessor}/${objeto}/${chave}`, valor),
+    ])
+
+    inserirDados({ [idProfessor]: professor }, 'professores')
 }

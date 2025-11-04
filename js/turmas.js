@@ -122,54 +122,19 @@ async function selecionarTurno(turno) {
 
 }
 
-async function balaoSemana(idDisciplina) {
+async function salvarDiasSemana(input, idDisciplina) {
 
-    const disciplina = await recuperarDado('disciplinas', idDisciplina)
-    const discpTurma = disciplina?.turmas?.[idTurmaAtual] || {}
-
-    const strDias = dias.map(dia => `
-        <div class="contorno-dias">
-            <input name="${dia}" type="checkbox" ${discpTurma?.dispDias?.[dia] ? 'checked' : ''}>
-            <span>${dia}</span>
-        </div>
-        `).join('')
-
-    const acumulado = `
-        <div style="${vertical}; background-color: #d2d2d2; padding: 2rem;">
-            <div style="${horizontal}; gap: 2px;">
-                ${strDias}
-            </div>
-            <hr>
-            <button onclick="salvarDiasSemana('${idDisciplina}')">Salvar</button>
-        </div>
-    `
-
-    popup(acumulado, 'Dias da Semana', true)
-}
-
-async function salvarDiasSemana(idDisciplina) {
-
-    overlayAguarde()
-
+    const dia = input.dataset.dia
     const disciplina = await recuperarDado('disciplinas', idDisciplina)
 
-    if (!disciplina.turmas) disciplina.turmas = {}
-    if (!disciplina.turmas[idTurmaAtual]) disciplina.turmas[idTurmaAtual] = {}
+    disciplina.turmas ??= {}
+    disciplina.turmas[idTurmaAtual] ??= {}
+    disciplina.turmas[idTurmaAtual].dispDias ??= {}
 
-    const dispDias = {}
-    for (const dia of dias) {
-        const input = document.querySelector(`[name="${dia}"]`)
-        dispDias[dia] = input.checked
-    }
+    disciplina.turmas[idTurmaAtual].dispDias[dia] = input.checked
 
-    disciplina.turmas[idTurmaAtual].dispDias = dispDias
-
-    enviar(`disciplinas/${idDisciplina}/turmas/${idTurmaAtual}/dispDias`, dispDias)
+    enviar(`disciplinas/${idDisciplina}/turmas/${idTurmaAtual}/dispDias/${dia}`, input.checked)
     await inserirDados({ [idDisciplina]: disciplina }, 'disciplinas')
-
-    await planoAulas(idTurmaAtual)
-
-    removerPopup()
 
 }
 
@@ -187,7 +152,7 @@ async function atualizarDatas(data, chave, idDisciplina) {
     } else {
         deletar(`disciplinas/${idDisciplina}/turmas/${idTurmaAtual}/${chave}`)
     }
-    
+
     await inserirDados({ [idDisciplina]: disciplina }, 'disciplinas')
 
     await planoAulas(idTurmaAtual)
@@ -206,13 +171,19 @@ async function criarLinhaDisciplinaTurma(idDisciplina, dados, turno) {
 
     const chave = esqT?.[turno] || ''
 
+    const strDias = dias.map(dia => `
+        <div class="contorno-dias">
+            <input onchange="salvarDiasSemana(this, '${idDisciplina}')" data-dia="${dia}" type="checkbox" ${discpTurma?.dispDias?.[dia] ? 'checked' : ''}>
+            <span>${dia}</span>
+        </div>
+        `).join('')
+
     const tds = `
         <td>${dados?.nome || ''}</td>
         <td>${dados?.[chave] || ''}</td>
         <td>
-            <div style="${horizontal}; justify-content: space-between; gap: 2px;">
-                <div style="${horizontal}; gap: 1px;">${strDisp}</div>
-                <img src="imagens/lapis.png" style="width: 1.5rem;" onclick="balaoSemana('${idDisciplina}')">
+            <div style="${horizontal}; gap: 2px;">
+                ${strDias}
             </div>
         </td>
         <td>
@@ -239,28 +210,60 @@ async function professoresDisponiveis(idDisciplina) {
 
     const disciplina = await recuperarDado('disciplinas', idDisciplina)
     const professores = await recuperarDados('professores')
-
-    const profs = Object.keys(disciplina?.professores || {})
-
-    profs.push('Sem professor')
-
-    let strProfs = ''
-    for (const prof of profs) {
-        strProfs += `
-        <div class="contorno-dias" style="justify-content: start; align-items: center; flex-direction: row; gap: 1rem; width: 100%;">
-            <input onchange="salvarProfessorDisciplina('${idDisciplina}')" id="${prof}" name="professor" type="radio">
-            <span>${professores?.[prof]?.nome || prof}</span>
-        </div>
-        `
+    const turmas = await recuperarDados('turmas')
+    const esquema = {
+        btnExtras: `<span style="padding: 5px;">${disciplina.nome}</span>`,
+        removerPesquisa: true,
+        body: 'body3',
+        colunas: ['Editar', 'Professores', 'Turmas', 'Dias escolhidos', 'Interesse nessa aula', 'Selecione']
     }
 
     const acumulado = `
-        <div style="${vertical}; gap: 2px; background-color: #d2d2d2; padding: 2rem;">
-            ${strProfs == '' ? 'Lista vazia' : strProfs}
+        <div id="divProfs" data-disciplina="${idDisciplina}" style="${vertical}; gap: 2px; background-color: #d2d2d2; padding: 2rem;">
+            ${modeloTabela(esquema)}
         </div>
     `
+    const divProfs = document.getElementById('divProfs')
+    if (!divProfs) popup(acumulado, 'Gerenciar professores', true)
+    const body = document.getElementById('body3')
 
-    popup(acumulado, 'Selecione o professor', true)
+    for (const [idProfessor, professor] of Object.entries(professores)) {
+
+        let strTurmas = ''
+        for (const [idTurma, turma] of Object.entries(disciplina?.turmas || {})) {
+            if (turma.professor == idProfessor) strTurmas += `${turmas?.[idTurma]?.nome}`
+        }
+
+        let strDias = ''
+        for (const [dia, status] of Object.entries(professor?.dispDias || {})) {
+            if (status) strDias += `<span class="contorno-dias-semana">${dia}</span>`
+        }
+
+        const celulas = `
+            <td>
+                <img onclick="adicionarProfessor('${idProfessor}')" src="imagens/professor.png" style="width: 1.8rem;">
+            </td>
+            <td>${professor.nome}</td>
+            <td>
+                ${strTurmas}
+            </td>
+            <td>
+                ${strDias}
+            </td>
+            <td>
+                <img src="imagens/${disciplina.professores[idProfessor] ? 'concluido' : 'cancel'}.png" style="width: 1.8rem;">
+            </td>
+            <td>
+                <input ${disciplina?.turmas?.[idTurmaAtual]?.professor == idProfessor ? 'checked' : ''} name="professorAtivo" style="width: 2rem; height: 2rem;" type="radio">
+            </td>
+        `
+
+        const existente = document.getElementById(`PROF_${idProfessor}`)
+        if (existente) return existente.innerHTML = celulas
+
+        body.insertAdjacentHTML('beforeend', `<tr id="PROF_${idProfessor}">${celulas}</tr>`)
+
+    }
 
 }
 

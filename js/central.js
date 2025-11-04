@@ -37,7 +37,7 @@ const dtFormatada = (data) => {
     return `${dia}/${mes}/${ano}`
 }
 
-const modeloTabela = ({ colunas, base, btnExtras, body, removerPesquisa }) => {
+const modeloTabela = ({ colunas, base, btnExtras, body = 'body', removerPesquisa }) => {
 
     const ths = colunas
         .map(col => `<th>${col}</th>`).join('')
@@ -63,7 +63,7 @@ const modeloTabela = ({ colunas, base, btnExtras, body, removerPesquisa }) => {
         <div class="recorteTabela">
             <table class="tabela">
                 ${thead}
-                <tbody id="${body || 'body'}"></tbody>
+                <tbody id="${body}"></tbody>
             </table>
         </div>
         <div class="rodapeTabela"></div>
@@ -754,10 +754,16 @@ function enviar(caminho, info) {
             },
             body: JSON.stringify(objeto)
         })
-            .then(data => resolve(data))
+            .then(data => {
+                if (data.mensagem) {
+                    popup(mensagem(data.mensagem), 'Alerta', true)
+                    reject()
+                }
+                resolve(data)
+            })
             .catch(() => {
                 salvarOffline(objeto, 'enviar')
-                resolve();
+                resolve()
             });
     });
 }

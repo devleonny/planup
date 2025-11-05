@@ -414,7 +414,6 @@ async function atualizarApp() {
 
     for (const base of basesAuxiliares) {
         sincronizarApp(status)
-        await inserirDados({}, base, true) // Resetar
         await sincronizarDados(base, true)
         status.atual++
     }

@@ -133,7 +133,8 @@ async function salvarDiasSemana(input, idDisciplina) {
 
     disciplina.turmas[idTurmaAtual].dispDias[dia] = input.checked
 
-    enviar(`disciplinas/${idDisciplina}/turmas/${idTurmaAtual}/dispDias/${dia}`, input.checked)
+    const resposta = await enviar(`disciplinas/${idDisciplina}/turmas/${idTurmaAtual}/dispDias/${dia}`, input.checked)
+    console.log(resposta)
     await inserirDados({ [idDisciplina]: disciplina }, 'disciplinas')
 
 }
@@ -195,7 +196,7 @@ async function criarLinhaDisciplinaTurma(idDisciplina, dados, turno) {
         <td>
             <div style="${horizontal}; justify-content: space-between; gap: 3px;">
                 <span>${professor?.nome || '...'}</span>
-                <img onclick="professoresDisponiveis('${idDisciplina}')" src="imagens/lapis.png" style="width: 1.5rem;">
+                <img onclick="professoresDisponiveis('${idDisciplina}')" src="imagens/professor.png" style="width: 1.5rem;">
             </div>
         </td>
     `
@@ -205,17 +206,17 @@ async function criarLinhaDisciplinaTurma(idDisciplina, dados, turno) {
     document.getElementById('body').insertAdjacentHTML('beforeend', `<tr id="${idDisciplina}">${tds}</tr>`)
 }
 
-
 async function professoresDisponiveis(idDisciplina) {
-
     const disciplina = await recuperarDado('disciplinas', idDisciplina)
     const professores = await recuperarDados('professores')
     const turmas = await recuperarDados('turmas')
+    const todasDisciplinas = await recuperarDados('disciplinas')
+    const turma = turmas[idTurmaAtual]
     const esquema = {
-        btnExtras: `<span style="padding: 5px;">${disciplina.nome}</span>`,
+        btnExtras: `<span style="padding: 5px; font-size: 1.5rem;">${disciplina.nome}</span>`,
         removerPesquisa: true,
         body: 'body3',
-        colunas: ['Editar', 'Professores', 'Turmas', 'Dias escolhidos', 'Interesse nessa aula', 'Selecione']
+        colunas: ['Editar', 'Professores', 'Turmas', 'Turnos', 'Dias escolhidos', 'Interesse nessa aula', 'Selecione']
     }
 
     const acumulado = `
@@ -223,19 +224,64 @@ async function professoresDisponiveis(idDisciplina) {
             ${modeloTabela(esquema)}
         </div>
     `
+    const dispDias = disciplina?.turmas?.[idTurmaAtual]?.dispDias || {}
+
     const divProfs = document.getElementById('divProfs')
     if (!divProfs) popup(acumulado, 'Gerenciar professores', true)
     const body = document.getElementById('body3')
 
     for (const [idProfessor, professor] of Object.entries(professores)) {
+        let pareamentoTURNO = false
+        let strTurnos = ''
 
-        let strTurmas = ''
-        for (const [idTurma, turma] of Object.entries(disciplina?.turmas || {})) {
-            if (turma.professor == idProfessor) strTurmas += `${turmas?.[idTurma]?.nome}`
+        for (const [turno, status] of Object.entries(professor?.dispTurnos || {})) {
+            if (status) strTurnos += `<span class="contorno-dias-semana">${turno}</span>`
+            if (turma.turno == turno && status) pareamentoTURNO = true
         }
 
+        let strTurmas = ''
+        let turmasOk = true // Assume que está tudo OK inicialmente
+
+        // Verifica se o professor está em outra turma DESTA MESMA disciplina
+        for (const [idTurma, turmaInfo] of Object.entries(disciplina?.turmas || {})) {
+            if (turmaInfo.professor == idProfessor && idTurma !== idTurmaAtual) {
+                strTurmas += `${turmas?.[idTurma]?.nome} `
+                
+                // 1. Se o turno é igual -> CANCEL
+                if (turmaInfo.turno === turma.turno) {
+                    turmasOk = false
+                }
+            }
+        }
+
+        // 2. Verifica se existe outra disciplina no mesmo dia e turno
+        if (turmasOk) {
+            for (const [idOutraDisciplina, outraDisciplina] of Object.entries(todasDisciplinas || {})) {
+                for (const [idTurmaOutra, turmaOutra] of Object.entries(outraDisciplina?.turmas || {})) {
+                    if (turmaOutra.professor == idProfessor && 
+                        idOutraDisciplina !== idDisciplina && // É outra disciplina
+                        turmaOutra.turno === turma.turno) { // Mesmo turno
+                        
+                        // Verifica se tem dia em comum
+                        const temDiaComum = Object.keys(turmaOutra.dispDias || {}).some(dia => 
+                            dispDias[dia] && turmaOutra.dispDias[dia]
+                        )
+                        
+                        if (temDiaComum) {
+                            turmasOk = false
+                            break
+                        }
+                    }
+                }
+                if (!turmasOk) break
+            }
+        }
+
+        let pareamentoDIAS = false
         let strDias = ''
         for (const [dia, status] of Object.entries(professor?.dispDias || {})) {
+            // Verificar se o dia da disciplina coincide com os dias do professor;
+            if (dispDias[dia] && status) pareamentoDIAS = true
             if (status) strDias += `<span class="contorno-dias-semana">${dia}</span>`
         }
 
@@ -245,26 +291,45 @@ async function professoresDisponiveis(idDisciplina) {
             </td>
             <td>${professor.nome}</td>
             <td>
-                ${strTurmas}
+                <div style="${horizontal}; gap: 2px;">
+                    <div style="${vertical}; gap: 1px;">
+                        ${strTurmas || 'Nenhuma turma'}
+                    </div>
+                    <img src="imagens/${turmasOk ? 'concluido' : 'cancel'}.png" style="width: 1.8rem;">
+                </div>
             </td>
             <td>
-                ${strDias}
+                <div style="${horizontal}; gap: 2px;">
+                    <div style="${vertical}; gap: 1px;">
+                        ${strTurnos}
+                    </div>
+                    <img src="imagens/${pareamentoTURNO ? 'concluido' : 'cancel'}.png" style="width: 1.8rem;">
+                </div>
             </td>
             <td>
-                <img src="imagens/${disciplina.professores[idProfessor] ? 'concluido' : 'cancel'}.png" style="width: 1.8rem;">
+                <div style="${horizontal}; gap: 2px;">
+                    <div style="${vertical}; gap: 1px;">
+                        ${strDias}
+                    </div>
+                    <img src="imagens/${pareamentoDIAS ? 'concluido' : 'cancel'}.png" style="width: 1.8rem;">
+                </div>
             </td>
             <td>
-                <input ${disciplina?.turmas?.[idTurmaAtual]?.professor == idProfessor ? 'checked' : ''} name="professorAtivo" style="width: 2rem; height: 2rem;" type="radio">
+                <img src="imagens/${disciplina.professores?.[idProfessor] ? 'concluido' : 'cancel'}.png" style="width: 1.8rem;">
+            </td>
+            <td>
+                <input id="${idProfessor}" onchange="salvarProfessorDisciplina('${idDisciplina}')" ${disciplina?.turmas?.[idTurmaAtual]?.professor == idProfessor ? 'checked' : ''} name="professor" style="width: 2rem; height: 2rem;" type="radio">
             </td>
         `
 
         const existente = document.getElementById(`PROF_${idProfessor}`)
-        if (existente) return existente.innerHTML = celulas
+        if (existente) {
+            existente.innerHTML = celulas
+            continue
+        }
 
         body.insertAdjacentHTML('beforeend', `<tr id="PROF_${idProfessor}">${celulas}</tr>`)
-
     }
-
 }
 
 async function salvarProfessorDisciplina(idDisciplina) {

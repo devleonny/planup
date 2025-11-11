@@ -1,45 +1,52 @@
 const dias = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab']
-const turnos = ['Manhã', 'Tarde', 'Noite']
+const turnos = ['Manhã', 'Tarde', 'Noite', 'MT']
+const permissoes = ['coordenador', 'professor', 'administrativo', 'novo']
 
-async function telaProfessores() {
+async function telaUsuarios() {
 
     mostrarMenus()
 
-    const btnExtras = `<button onclick="adicionarProfessor()">Adicionar</button>`
     const nomeBase = 'professores'
     const acumulado = `
-        ${modeloTabela({ colunas: ['Nome', 'Semanal', 'Turno', 'Disciplinas', 'E-mail', 'Contato', ''], base: nomeBase, btnExtras })}
+        ${modeloTabela({ colunas: ['Nome', 'Setor', 'Dias da Semana', 'Turnos', 'Disciplinas de Interesse', 'E-mail', 'Telefone', ''], base: nomeBase })}
     `
-    titulo.textContent = 'Professores'
+    titulo.textContent = 'Gerenciar Professores'
     telaInterna.innerHTML = acumulado
 
-    const base = await recuperarDados(nomeBase)
-    for (const [id, dados] of Object.entries(base).reverse()) {
-        await criarLinhaProfessores(id, dados)
+    const dados = await recuperarDados(`dados_setores`)
+    for (const [usuario, d] of Object.entries(dados).reverse()) {
+
+        const professor = await recuperarDado('professores', usuario) || {}
+
+        const mesclado = {
+            ...d,
+            ...Object.fromEntries(Object.entries(professor).filter(([_, v]) => v !== '' && v != null))
+        }
+
+        await criarLinhaUsuarios(usuario, mesclado)
     }
 
 }
 
-async function criarLinhaProfessores(idProfessor, dados) {
-
-    const professor = await recuperarDado('professores', idProfessor)
+async function criarLinhaUsuarios(usuario, dados) {
 
     const strDias = dias.map(dia => `
         <div class="contorno-dias">
-            <input onchange="salvarPrefs(this, '${idProfessor}')" data-chave="${dia}" data-objeto="dispDias" type="checkbox" ${professor?.dispDias?.[dia] ? 'checked' : ''}>
+            <input onchange="salvarPrefs(this, '${usuario}')" data-chave="${dia}" data-objeto="dispDias" type="checkbox" ${dados?.dispDias?.[dia] ? 'checked' : ''}>
             <span>${dia}</span>
         </div>
         `).join('')
 
     const strTurnos = turnos.map(turno => `
         <div class="contorno-dias">
-            <input onchange="salvarPrefs(this, '${idProfessor}')" data-chave="${turno}" data-objeto="dispTurnos" type="checkbox" ${professor?.dispTurnos?.[turno] ? 'checked' : ''}>
+            <input onchange="salvarPrefs(this, '${usuario}')" data-chave="${turno}" data-objeto="dispTurnos" type="checkbox" ${dados?.dispTurnos?.[turno] ? 'checked' : ''}>
             <span>${turno}</span>
         </div>
         `).join('')
 
     const tds = `
-        <td>${dados?.nome || ''}</td>
+        <td>${dados?.nome_completo || ''}</td>
+        <td>${dados?.permissao || ''}</td>
         <td>
             <div style="${horizontal}; gap: 1px;">
                 ${strDias}
@@ -51,19 +58,19 @@ async function criarLinhaProfessores(idProfessor, dados) {
             </div>
         </td>
         <td>
-            <img onclick="painelDisciplinas('${idProfessor}')" src="imagens/turmas.png" style="width: 2.3rem;">
+            <img onclick="painelDisciplinas('${usuario}')" src="imagens/turmas.png" style="width: 2.3rem;">
         </td>
         <td>${dados?.email || ''}</td>
-        <td>${dados?.contato || ''}</td>
+        <td>${dados?.telefone || ''}</td>
         <td>
-            <img onclick="adicionarProfessor('${idProfessor}')" src="imagens/pesquisar.png" style="width: 2rem;">
+           <img onclick="adicionarProfessor('${usuario}')" src="imagens/pesquisar.png" style="width: 2rem;">
         </td>
     `
 
-    const trExistente = document.getElementById(idProfessor)
+    const trExistente = document.getElementById(usuario)
     if (trExistente) return trExistente.innerHTML = tds
 
-    document.getElementById('body').insertAdjacentHTML('beforeend', `<tr id="${idProfessor}">${tds}</tr>`)
+    document.getElementById('body').insertAdjacentHTML('beforeend', `<tr id="${usuario}">${tds}</tr>`)
 }
 
 async function painelDisciplinas(idProfessor) {
@@ -114,7 +121,14 @@ async function gerenciarProfessor(input, idProfessor, idDisciplina) {
 
 async function adicionarProfessor(idProfessor) {
 
-    const professor = await recuperarDado('professores', idProfessor)
+    const acesso = JSON.parse(localStorage.getItem('acesso')) || {}
+
+    const dadosProfessor = await recuperarDado('professores', idProfessor) || {}
+
+    const professor = {
+        ...await recuperarDado('dados_setores', idProfessor),
+        ...Object.fromEntries(Object.entries(dadosProfessor).filter(([_, v]) => v !== '' && v != null))
+    }
 
     const strDias = dias.map(dia => `
         <div class="contorno-dias">
@@ -130,10 +144,19 @@ async function adicionarProfessor(idProfessor) {
         </div>
         `).join('')
 
+
+    const exclusivo = `
+        <hr>
+        ${modeloLivre('Permissão',
+        `<select onchange="configuracoes('${idProfessor}', 'permissao', this.value)">
+                ${permissoes.map(op => `<option ${professor?.permissao == op ? 'selected' : ''}>${op}</option>`).join('')}
+            </select>`)
+        }`
+
     const acumulado = `
         <div class="formulario">
             
-            ${modeloLivre('Nome', `<input name="nome" value="${professor?.nome || ''}">`)}
+            ${modeloLivre('Nome', `<input name="nome_completo" value="${professor?.nome_completo || ''}">`)}
             ${modeloLivre('Disponibilidade', `
                 <div style="${horizontal}; gap: 3px;">
                     ${strDias}
@@ -144,14 +167,20 @@ async function adicionarProfessor(idProfessor) {
                     ${strTurnos}
                 </div>
                 `)}
+            
+            <div style="${horizontal}; gap: 1rem;">
+                <span>Disciplinas de Interesse</span>
+                <img onclick="painelDisciplinas('${idProfessor}')" src="imagens/turmas.png" style="width: 2.3rem;">
+            </div>
             ${modeloLivre('E-mail', `<input name="email" value="${professor?.email || ''}">`)}
-            ${modeloLivre('Contato', `<input name="contato" value="${professor?.contato || ''}">`)}
+            ${modeloLivre('Telefone', `<input name="contato" value="${professor?.telefone || ''}">`)}
+
+            ${acesso?.permissao == 'coordenador' ? exclusivo : ''}    
 
             <hr>
             
             <div style="${horizontal}; width: 100%; justify-content: space-between;">
                 <button onclick="salvarProfessor(${idProfessor ? `'${idProfessor}'` : ''})">Salvar</button>
-                ${idProfessor ? `<button style="background-color: #B12425;" onclick="confirmarExclusaoProfessor('${idProfessor}')">Excluir</button>` : ''}
             </div>
 
         </div>
@@ -161,44 +190,9 @@ async function adicionarProfessor(idProfessor) {
 
 }
 
-async function confirmarExclusaoProfessor(idProfessor) {
-
-    const acumulado = `
-        <div style="${horizontal}; background-color: #d2d2d2; padding: 2rem; gap: 1rem;">
-
-            <img src="gifs/alerta.gif" style="width: 3rem;">
-            <span>Você tem certeza disso?</span>
-            <button onclick="excluirProfessor('${idProfessor}')">Confirmar</button>
-
-        </div>
-    `
-
-    popup(acumulado, 'Tem certeza?', true)
-
-}
-
-async function excluirProfessor(idProfessor) {
-
-    removerPopup() // telaProf
-    removerPopup() // popup conf
-    overlayAguarde()
-
-    const resposta = await deletar(`professores/${idProfessor}`)
-
-    if (!resposta.err) {
-        deletarDB('professores', idProfessor)
-        const linha = document.getElementById(idProfessor)
-        if (linha) linha.remove()
-        removerOverlay()
-    }
-
-}
-
-async function salvarProfessor(idProfessor) {
+async function salvarProfessor(usuario) {
 
     overlayAguarde()
-
-    idProfessor = idProfessor || ID5digitos()
 
     const dispDias = {}
     const dispTurnos = {}
@@ -213,16 +207,21 @@ async function salvarProfessor(idProfessor) {
         dispTurnos[turno] = input.checked
     }
 
-    const professor = {
-        nome: obVal('nome'),
+    const campos = {
+        nome_completo: obVal('nome_completo'),
         email: obVal('email'),
         contato: obVal('contato'),
         dispDias,
         dispTurnos
     }
 
-    enviar(`professores/${idProfessor}`, professor)
-    await inserirDados({ [idProfessor]: professor }, 'professores')
+    await Promise.all(
+        Object.entries(campos).map(([campo, valor]) =>
+            enviar(`professores/${usuario}/${campo}`, valor)
+        )
+    )
+
+    await inserirDados({ [usuario]: campos }, 'professores')
 
     removerPopup()
 
@@ -232,22 +231,19 @@ async function salvarProfessor(idProfessor) {
         return await professoresDisponiveis(idDisciplina)
     }
 
-    criarLinhaProfessores(idProfessor, professor)
+    telaUsuarios()
 
 }
 
-async function salvarPrefs(input, idProfessor) {
+async function salvarPrefs(input, usuario) {
     const { objeto, chave } = input.dataset
     const valor = input.checked
 
-    const professor = await recuperarDado('professores', idProfessor) || {}
+    const professor = await recuperarDado('professores', usuario) || {}
 
     professor[objeto] ??= {}
     professor[objeto][chave] = valor
 
-    await Promise.all([
-        enviar(`professores/${idProfessor}/${objeto}/${chave}`, valor),
-    ])
-
-    inserirDados({ [idProfessor]: professor }, 'professores')
+    enviar(`professores/${usuario}/${objeto}/${chave}`, valor)
+    inserirDados({ [usuario]: professor }, 'professores')
 }

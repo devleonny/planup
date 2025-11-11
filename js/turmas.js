@@ -2,7 +2,8 @@ let idTurmaAtual = null
 const esqT = {
     'Manhã': 'manha',
     'Tarde': 'tarde',
-    'Noite': 'noite'
+    'Noite': 'noite',
+    'MT': 'mt'
 }
 
 async function telaTurmas() {
@@ -12,23 +13,49 @@ async function telaTurmas() {
     const btn = `<button onclick="adicionarTurma()">Adicionar</button>`
     const nomeBase = 'turmas'
     const acumulado = `
-        ${modeloTabela({ colunas: ['Nome', 'Turno', 'Plano de Aulas', ''], base: nomeBase, btnExtras: btn })}
+        ${modeloTabela({ colunas: ['Nome', 'Turno', 'Andamento', 'Disciplinas Cursadas', 'Plano de Aulas', ''], base: nomeBase, btnExtras: btn })}
     `
     titulo.textContent = 'Turmas'
     telaInterna.innerHTML = acumulado
 
+    const disciplinas = await recuperarDados('disciplinas')
+    const total = Object.keys(disciplinas).length
+
     const base = await recuperarDados(nomeBase)
-    for (const [id, dados] of Object.entries(base).reverse()) {
-        await criarLinhaTurmas(id, dados)
+    for (const [idTurma, dados] of Object.entries(base).reverse()) {
+
+        let contador = 0
+        for (const [idDisciplina, disciplina] of Object.entries(disciplinas)) {
+            const turmas = disciplina?.turmas || {}
+            const turma = turmas[idTurma]
+            if (!turma) continue
+
+            const dt = turma.dtTermino
+            if (!dt) continue
+
+            const [ano, mes, dia] = dt.split('-').map(Number)
+            const dataTermino = new Date(ano, mes - 1, dia)
+
+            if (isNaN(dataTermino)) continue
+
+            const hoje = new Date()
+            if (dataTermino < hoje) contador++
+        }
+
+        await criarLinhaTurmas(idTurma, dados, contador, total)
     }
 
 }
 
-async function criarLinhaTurmas(idTurma, dados) {
+async function criarLinhaTurmas(idTurma, dados, contador, total) {
 
     const tds = `
         <td>${dados?.nome || ''}</td>
         <td>${dados?.turno || ''}</td>
+        <td>
+            ${divPorcentagem(Number(((contador / total) * 100).toFixed(0)))}
+        </td>
+        <td>${contador || 0}</td>
         <td>
             <div style="${horizontal}">
                 <img src="imagens/turmas.png" onclick="planoAulas('${idTurma}')" style="width: 2rem;">
@@ -48,7 +75,6 @@ async function criarLinhaTurmas(idTurma, dados) {
 async function adicionarTurma(idTurma) {
 
     const turma = await recuperarDado('turmas', idTurma)
-    const professor = await recuperarDado('professores', turma?.idProfessor)
 
     const acumulado = `
         <div class="formulario">
@@ -83,14 +109,14 @@ async function planoAulas(idTurma) {
         `).join('')
 
     const btnExtras = `
-    <div id="planoAulas" class="contorno-dias" style="flex-direction: row; gap: 1rem;">
-        ${strTurnos}
-    </div>
-    <div class="contorno-dias">
-        <span>Nome da Turma</span>
-        <span style="font-size: 1.2rem;">${turma.nome}</span>
-    </div>
-    <button onclick="telaTurmas()">Voltar</button>
+        <div id="planoAulas" class="contorno-dias" style="flex-direction: row; gap: 1rem;">
+            ${strTurnos}
+        </div>
+        <div class="contorno-dias">
+            <span>Nome da Turma</span>
+            <span style="font-size: 1.2rem;">${turma.nome}</span>
+        </div>
+        <button onclick="telaTurmas()">Voltar</button>
     `
     const acumulado = `
         ${modeloTabela({ btnExtras, colunas: ['Disciplinas', 'Carga Horária', 'Dia da Semana', 'Início', 'Término', 'Professores'] })}
@@ -134,7 +160,7 @@ async function salvarDiasSemana(input, idDisciplina) {
     disciplina.turmas[idTurmaAtual].dispDias[dia] = input.checked
 
     const resposta = await enviar(`disciplinas/${idDisciplina}/turmas/${idTurmaAtual}/dispDias/${dia}`, input.checked)
-    console.log(resposta)
+
     await inserirDados({ [idDisciplina]: disciplina }, 'disciplinas')
 
 }
@@ -163,7 +189,14 @@ async function atualizarDatas(data, chave, idDisciplina) {
 async function criarLinhaDisciplinaTurma(idDisciplina, dados, turno) {
 
     const discpTurma = dados?.turmas?.[idTurmaAtual] || {}
-    const professor = await recuperarDado('professores', discpTurma?.professor)
+    const idProfessor = discpTurma?.professor
+    const dProfessor = await recuperarDado('professores', idProfessor) || {}
+    const d = await recuperarDado('dados_setores', idProfessor) || {}
+
+    const professor = {
+        ...d,
+        ...Object.fromEntries(Object.entries(dProfessor).filter(([_, v]) => v !== '' && v != null))
+    }
 
     let strDisp = ''
     for (const [dia, status] of Object.entries(discpTurma?.dispDias || {})) {
@@ -188,14 +221,20 @@ async function criarLinhaDisciplinaTurma(idDisciplina, dados, turno) {
             </div>
         </td>
         <td>
-            <input style="background-color: ${discpTurma?.dtInicio ? '#64ff64' : '#ff7d7d'}" type="date" onchange="atualizarDatas(this.value, 'dtInicio', '${idDisciplina}')" value="${discpTurma?.dtInicio || ''}">
+            <div style="${horizontal}; gap: 1rem;">
+                <img src="imagens/${discpTurma?.dtInicio ? 'concluido' : 'cancel'}.png" style="width: 2rem;">
+                <input type="date" onchange="atualizarDatas(this.value, 'dtInicio', '${idDisciplina}')" value="${discpTurma?.dtInicio || ''}">
+            </div> 
         </td>
         <td>
-            <input style="background-color: ${discpTurma?.dtTermino ? '#64ff64' : '#ff7d7d'}" type="date" onchange="atualizarDatas(this.value, 'dtTermino', '${idDisciplina}')" value="${discpTurma?.dtTermino || ''}">
+            <div style="${horizontal}; gap: 1rem;">
+                <img src="imagens/${discpTurma?.dtTermino ? 'concluido' : 'cancel'}.png" style="width: 2rem;">
+                <input type="date" onchange="atualizarDatas(this.value, 'dtTermino', '${idDisciplina}')" value="${discpTurma?.dtTermino || ''}">
+            </div> 
         </td>
         <td>
             <div style="${horizontal}; justify-content: space-between; gap: 3px;">
-                <span>${professor?.nome || '...'}</span>
+                <span>${professor?.nome_completo || '...'}</span>
                 <img onclick="professoresDisponiveis('${idDisciplina}')" src="imagens/professor.png" style="width: 1.5rem;">
             </div>
         </td>
@@ -207,10 +246,10 @@ async function criarLinhaDisciplinaTurma(idDisciplina, dados, turno) {
 }
 
 async function professoresDisponiveis(idDisciplina) {
-    const disciplina = await recuperarDado('disciplinas', idDisciplina)
+    const disciplinas = await recuperarDados('disciplinas')
+    const disciplina = disciplinas?.[idDisciplina] || {}
     const professores = await recuperarDados('professores')
     const turmas = await recuperarDados('turmas')
-    const todasDisciplinas = await recuperarDados('disciplinas')
     const turma = turmas[idTurmaAtual]
     const esquema = {
         btnExtras: `<span style="padding: 5px; font-size: 1.5rem;">${disciplina.nome}</span>`,
@@ -228,9 +267,19 @@ async function professoresDisponiveis(idDisciplina) {
 
     const divProfs = document.getElementById('divProfs')
     if (!divProfs) popup(acumulado, 'Gerenciar professores', true)
-    const body = document.getElementById('body3')
 
-    for (const [idProfessor, professor] of Object.entries(professores)) {
+    const body = document.getElementById('body3')
+    const hoje = new Date().toISOString().split('T')[0] // formato AAAA-MM-DD
+
+    for (const [idProfessor, dados] of Object.entries(professores)) {
+
+        const d = await recuperarDado('dados_setores', idProfessor) || {}
+
+        const professor = {
+            ...dados,
+            ...Object.fromEntries(Object.entries(d).filter(([_, v]) => v !== '' && v != null))
+        }
+
         let pareamentoTURNO = false
         let strTurnos = ''
 
@@ -240,62 +289,63 @@ async function professoresDisponiveis(idDisciplina) {
         }
 
         let strTurmas = ''
-        let turmasOk = true // Assume que está tudo OK inicialmente
+        let conflitos = false
 
-        // Verifica se o professor está em outra turma DESTA MESMA disciplina
-        for (const [idTurma, turmaInfo] of Object.entries(disciplina?.turmas || {})) {
-            if (turmaInfo.professor == idProfessor && idTurma !== idTurmaAtual) {
-                strTurmas += `${turmas?.[idTurma]?.nome} `
-                
-                // 1. Se o turno é igual -> CANCEL
-                if (turmaInfo.turno === turma.turno) {
-                    turmasOk = false
-                }
-            }
-        }
+        // Percorre TODAS as disciplinas e TODAS as turmas
+        for (const [idDisc, disc] of Object.entries(disciplinas)) {
+            for (const [idTurmaDiferente, turmaDiferente] of Object.entries(disc?.turmas || {})) {
+                if (turmaDiferente.professor !== idProfessor) continue
+                if (idTurmaDiferente == idTurmaAtual && idDisc == idDisciplina) continue
 
-        // 2. Verifica se existe outra disciplina no mesmo dia e turno
-        if (turmasOk) {
-            for (const [idOutraDisciplina, outraDisciplina] of Object.entries(todasDisciplinas || {})) {
-                for (const [idTurmaOutra, turmaOutra] of Object.entries(outraDisciplina?.turmas || {})) {
-                    if (turmaOutra.professor == idProfessor && 
-                        idOutraDisciplina !== idDisciplina && // É outra disciplina
-                        turmaOutra.turno === turma.turno) { // Mesmo turno
-                        
-                        // Verifica se tem dia em comum
-                        const temDiaComum = Object.keys(turmaOutra.dispDias || {}).some(dia => 
-                            dispDias[dia] && turmaOutra.dispDias[dia]
-                        )
-                        
-                        if (temDiaComum) {
-                            turmasOk = false
-                            break
-                        }
+                // Verifica se a turma diferente já terminou
+                const dtTermino = turmaDiferente?.dtTermino
+                if (dtTermino && dtTermino < hoje) continue // já acabou, ignora
+
+                const diasTurma = turmaDiferente?.dispDias || {}
+                const dadosTurmaDiferente = turmas?.[idTurmaDiferente] || {}
+                const turnoTurmaDiferente = dadosTurmaDiferente?.turno
+
+                const mesmoTurno = turnoTurmaDiferente === turma.turno
+                const mesmoDia = Object.entries(dispDias).some(([dia, ativo]) => ativo && diasTurma[dia])
+
+                if (mesmoTurno && mesmoDia) {
+                    conflitos = true
+                    const nomeTurma = turmas?.[idTurmaDiferente]?.nome || `Turma ${idTurmaDiferente}`
+                    const diasConflitantes = Object.keys(dispDias).filter(dia => dispDias[dia] && diasTurma[dia])
+                    for (const dia of diasConflitantes) {
+                        strTurmas += `
+                            <div class="contorno-dias-semana" style="flex-direction: column; align-items: start;">
+                                <div style="${horizontal}; justify-content: space-between; width: 100%; gap: 1rem;">
+                                    <span><b>${nomeTurma}</b></span>
+                                    <img onclick="irParaTurma('${idTurmaDiferente}')" src="imagens/ir.png" style="width: 1.2rem;">
+                                </div>
+                                <span>${disc.nome}</span>
+                                <span>${turnoTurmaDiferente} - ${dia}</span>
+                            </div>
+                        `
                     }
                 }
-                if (!turmasOk) break
             }
         }
+
+        if (!strTurmas && !conflitos) strTurmas = 'Sem conflitos'
 
         let pareamentoDIAS = false
         let strDias = ''
         for (const [dia, status] of Object.entries(professor?.dispDias || {})) {
-            // Verificar se o dia da disciplina coincide com os dias do professor;
             if (dispDias[dia] && status) pareamentoDIAS = true
             if (status) strDias += `<span class="contorno-dias-semana">${dia}</span>`
         }
 
         const celulas = `
-            <td>
-                <img onclick="adicionarProfessor('${idProfessor}')" src="imagens/professor.png" style="width: 1.8rem;">
-            </td>
-            <td>${professor.nome}</td>
+            <td><img onclick="adicionarProfessor('${idProfessor}')" src="imagens/professor.png" style="width: 1.8rem;"></td>
+            <td>${professor.nome_completo}</td>
             <td>
                 <div style="${horizontal}; gap: 2px;">
-                    <div style="${vertical}; gap: 1px;">
-                        ${strTurmas || 'Nenhuma turma'}
+                    <div style="${vertical}; gap: 1px; max-width: 220px;">
+                        ${strTurmas}
                     </div>
-                    <img src="imagens/${turmasOk ? 'concluido' : 'cancel'}.png" style="width: 1.8rem;">
+                    <img src="imagens/${conflitos ? 'cancel' : 'concluido'}.png" style="width: 1.8rem;">
                 </div>
             </td>
             <td>
@@ -318,19 +368,31 @@ async function professoresDisponiveis(idDisciplina) {
                 <img src="imagens/${disciplina.professores?.[idProfessor] ? 'concluido' : 'cancel'}.png" style="width: 1.8rem;">
             </td>
             <td>
-                <input id="${idProfessor}" onchange="salvarProfessorDisciplina('${idDisciplina}')" ${disciplina?.turmas?.[idTurmaAtual]?.professor == idProfessor ? 'checked' : ''} name="professor" style="width: 2rem; height: 2rem;" type="radio">
+                <input id="${idProfessor}" onchange="salvarProfessorDisciplina('${idDisciplina}')" 
+                    ${disciplina?.turmas?.[idTurmaAtual]?.professor == idProfessor ? 'checked' : ''} 
+                    name="professor" style="width: 2rem; height: 2rem;" type="radio">
             </td>
         `
 
         const existente = document.getElementById(`PROF_${idProfessor}`)
         if (existente) {
             existente.innerHTML = celulas
-            continue
+        } else {
+            body.insertAdjacentHTML('beforeend', `<tr id="PROF_${idProfessor}">${celulas}</tr>`)
         }
-
-        body.insertAdjacentHTML('beforeend', `<tr id="PROF_${idProfessor}">${celulas}</tr>`)
     }
 }
+
+async function irParaTurma(idTurma) {
+
+    const telaInterna = document.querySelector('.telaInterna')
+    telaInterna.innerHTML = ''
+
+    removerPopup()
+    await planoAulas(idTurma)
+
+}
+
 
 async function salvarProfessorDisciplina(idDisciplina) {
     const selecionado = document.querySelector('input[name="professor"]:checked')
@@ -386,14 +448,13 @@ async function salvarTurma(idTurma) {
 
     idTurma = idTurma || ID5digitos()
 
-    const turma = {
-        nome: obVal('nome'),
-        dtInicio: obVal('dtInicio'),
-        dtTermino: obVal('dtInicio'),
-        idProfessor: document.querySelector('[name="professor"]').id
-    }
+    const nome = obVal('nome')
 
-    enviar(`turmas/${idTurma}`, turma)
+    enviar(`turmas/${idTurma}/nome`, nome)
+
+    const turma = await recuperarDado('turmas', idTurma) || {}
+    turma.nome = nome
+
     await inserirDados({ [idTurma]: turma }, 'turmas')
 
     removerPopup()

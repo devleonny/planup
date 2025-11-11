@@ -14,6 +14,47 @@ let telaInterna = null
 let emAtualizacao = false
 const voltarClientes = `<button style="background-color: #3131ab;" onclick="telaClientes()">Voltar</button>`
 
+document.addEventListener('keydown', function (event) {
+    if (event.key === 'F8') resetarBases()
+})
+
+async function resetarBases() {
+
+    overlayAguarde(true)
+
+    const divMensagem = document.querySelector('.div-mensagem')
+
+    divMensagem.innerHTML = `
+        <div style="${vertical}; gap: 1vh;">
+            <label><b>PlanUP</b>: Por favor, aguarde...</label>
+            <br>
+            
+            <div id="logs" style="${vertical}; gap: 1vh;"></div>
+        </div>
+    `
+
+    const logs = document.getElementById('logs')
+
+    logs.insertAdjacentHTML('beforeend', '<label>Criando uma nova Base, 0km, novíssima...</label>')
+
+    const bases = [
+        'professores',
+        'turmas',
+        'disciplinas',
+        'dados_setores'
+    ]
+
+    for (const base of bases) {
+        await sincronizarDados(base, true, true) // Nome base, overlay off e resetar bases;
+        logs.insertAdjacentHTML('beforeend', `<label>Sincronizando: ${base}</label>`)
+    }
+
+    telaPrincipal()
+    removerOverlay()
+
+}
+
+
 function obVal(name) {
     const el = document.querySelector(`[name="${name}"]`);
     return el ? el.value : '';
@@ -256,8 +297,6 @@ function salvarCadastro() {
             })
             .then(data => {
 
-                console.log(data);
-
                 if (data.mensagem) {
                     return popup(mensagem(data.mensagem), 'AVISO', true);
                 }
@@ -339,6 +378,7 @@ function overlayAguarde() {
 
     const elemento = `
         <div class="aguarde">
+            <div class="div-mensagem"></div>
             <img src="gifs/loading.gif">
         </div>
     `
@@ -357,8 +397,16 @@ async function telaPrincipal() {
 
     toolbar.style.display = 'flex'
     const acesso = JSON.parse(localStorage.getItem('acesso'))
-    const acumulado = `
 
+    const menus = acesso.permissao !== 'professor'
+        ? `
+        ${btn('disciplina', 'Disciplinas', 'telaDisciplinas()')}
+        ${btn('turmas', 'Turmas', 'telaTurmas()')}
+        ${btn('perfil', 'Usuários', 'telaUsuarios()')}
+        `
+        : `${btn('professor', 'Minhas preferências', `adicionarProfessor('${acesso.usuario}')`)}`
+
+    const acumulado = `
     <div class="menu-container">
 
         <div class="side-menu" id="sideMenu">
@@ -370,11 +418,9 @@ async function telaPrincipal() {
             </div>
 
             ${btn('atualizar', 'Atualizar', 'atualizarApp()')}
-            ${btn('agenda', 'Agenda', '')}
-            ${btn('professor', 'Professores', 'telaProfessores()')}
-            ${btn('disciplina', 'Disciplinas', 'telaDisciplinas()')}
-            ${btn('turmas', 'Turmas', 'telaTurmas()')}
-            ${btn('perfil', 'Usuários', 'telaUsuarios()')}
+            ${btn('home', 'Página Inicial', 'telaPrincipal()')}
+            ${btn('agenda', 'Agenda', 'telaAgendas()')}
+            ${menus}
             ${btn('sair', 'Desconectar', 'deslogar()')}
 
         </div>
@@ -402,12 +448,11 @@ async function atualizarApp() {
 
     mostrarMenus(true)
     sincronizarApp()
-    let status = { total: 5, atual: 1 }
+    let status = { total: 4, atual: 1 }
 
     const basesAuxiliares = [
         'professores',
         'disciplinas',
-        'agendas',
         'turmas',
         'dados_setores'
     ];
@@ -423,6 +468,11 @@ async function atualizarApp() {
     sincronizarApp({ remover: true })
 
     emAtualizacao = false
+
+    const acesso = JSON.parse(localStorage.getItem('acesso')) || {}
+    const user = await recuperarDado('dados_setores', acesso?.usuario)
+    if (user) localStorage.setItem('acesso', JSON.stringify(user))
+
 }
 
 function sincronizarApp({ atual, total, remover } = {}) {
@@ -530,72 +580,12 @@ function verificarClique(event) {
     if (menu && menu.classList.contains('active') && !menu.contains(event.target)) menu.classList.remove('active')
 }
 
-async function telaUsuarios() {
-
-    mostrarMenus()
-
-    const nomeBase = 'dados_setores'
-    const acumulado = `
-        ${modeloTabela({ colunas: ['Nome', 'Usuário', 'Setor', 'Vincular Professor', 'Permissão', ''], base: nomeBase })}
-    `
-    titulo.textContent = 'Gerenciar Usuários'
-    telaInterna.innerHTML = acumulado
-
-    const dados_setores = await recuperarDados(nomeBase)
-    for (const [usuario, dados] of Object.entries(dados_setores).reverse()) {
-        await criarLinhaUsuarios(usuario, dados)
-    }
-
-}
-
-async function criarLinhaUsuarios(usuario, dados) {
-
-    const professor = await recuperarDado('professores', dados?.idProfessor)
-    const idAlet = ID5digitos()
-    const tds = `
-        <td>${dados.nome_completo}</td>
-        <td>${usuario}</td>
-        <td>${dados?.setor || ''}</td>
-        <td>
-            ${dados.setor == 'PROFESSOR(A)'
-            ? `<span class="opcoes"
-                ${professor ? `id="${dados.idProfessor}` : ''}
-                name="${idAlet}"
-                data-usuario="${usuario}"
-                onclick="cxOpcoes('${idAlet}', 'professores', ['nome'], 'vincularProfessor(this)')">
-                    ${professor?.nome || 'Selecione'}
-                </span>`
-            : ''}
-        </td>
-        <td>${dados?.permissao || ''}</td>
-        <td>
-            <img onclick="gerenciarUsuario('${usuario}')" src="imagens/pesquisar.png" style="width: 2rem;">
-        </td>
-    `
-
-    const trExistente = document.getElementById(usuario)
-    if (trExistente) return trExistente.innerHTML = tds
-
-    document.getElementById('body').insertAdjacentHTML('beforeend', `<tr id="${usuario}">${tds}</tr>`)
-}
-
-async function vincularProfessor(span) {
-
-    const usuario = span.dataset.usuario
-    const user = await recuperarDado('dados_setores', usuario)
-
-    user.idProfessor = span.id
-
-    await inserirDados({ [usuario]: user }, 'dados_setores')
-
-}
-
-async function sincronizarDados(base, overlayOff) {
+async function sincronizarDados(base, overlayOff, resetar) {
 
     if (!overlayOff) overlayAguarde()
 
-    let nuvem = await receber(base) || {}
-    await inserirDados(nuvem, base)
+    const nuvem = await receber(base) || {}
+    await inserirDados(nuvem, base, resetar)
 
     if (!overlayOff) removerOverlay()
 }
@@ -610,10 +600,6 @@ async function atualizarDados(base) {
 
         if (base == 'dados_setores') {
             criarLinhaUsuarios(id, objeto)
-        }
-
-        if (base == 'dados_setores') {
-            criarLinhaProfessores(id, objeto)
         }
 
     }
@@ -701,7 +687,7 @@ function telaLogin() {
         <div id="acesso" class="loginBloco">
 
             <div class="botaoSuperiorLogin">
-                <span>Acesso ao sistema</span>
+                <img src="imagens/logo.png">
             </div>
 
             <div class="baixoLogin">
@@ -1253,4 +1239,19 @@ function pesquisarCX(input) {
 
         div.style.display = (termoDiv.includes(termoPesquisa) || termoPesquisa === '') ? '' : 'none';
     }
+}
+
+function divPorcentagem(porcentagem) {
+    const valor = Math.max(0, Math.min(100, Number(porcentagem) || 0))
+
+    return `
+        <div style="${horizontal}; width: 95%;">
+            <div style="position: relative; border: 1px solid #666666; width: 100%; height: 16px; background: #eee; border-radius: 8px; overflow: hidden;">
+                <div style="width: ${valor}%; height: 100%; background: ${valor >= 70 ? "#4caf50" : valor >= 40 ? "#ffc107" : "#f44336"};"></div>
+                <label style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.7rem; color: #000;">
+                    ${valor}%
+                </label>
+            </div>
+        </div>
+    `
 }

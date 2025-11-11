@@ -46,6 +46,7 @@ async function adicionarDisciplina(idDisciplina) {
             ${modeloLivre('Manhã', `<input name="manha" type="number" value="${disciplina?.manha || ''}">`)}
             ${modeloLivre('Tarde', `<input name="tarde" type="number" value="${disciplina?.tarde || ''}">`)}
             ${modeloLivre('Noite', `<input name="noite" type="number" value="${disciplina?.noite || ''}">`)}
+            ${modeloLivre('Cor', `<input name="cor" type="color" value="${disciplina?.cor || '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}">`)}
 
             <hr>
             
@@ -100,14 +101,29 @@ async function salvarDisciplina(idDisciplina) {
 
     idDisciplina = idDisciplina || ID5digitos()
 
+    const nome = obVal('nome')
+    const manha = Number(obVal('manha'))
+    const tarde = Number(obVal('tarde'))
+    const noite = Number(obVal('noite'))
+    const cor = obVal('cor')
+
+    await Promise.all([
+        enviar(`disciplinas/${idDisciplina}/nome`, nome),
+        enviar(`disciplinas/${idDisciplina}/manha`, manha),
+        enviar(`disciplinas/${idDisciplina}/tarde`, tarde),
+        enviar(`disciplinas/${idDisciplina}/noite`, noite),
+        enviar(`disciplinas/${idDisciplina}/cor`, cor)
+    ])
+
     const disciplina = {
-        nome: obVal('nome'),
-        manha: Number(obVal('manha')),
-        tarde: Number(obVal('tarde')),
-        noite: Number(obVal('noite'))
+        ...await recuperarDado('disciplinas', idDisciplina),
+        nome,
+        manha,
+        tarde,
+        noite,
+        cor
     }
 
-    enviar(`disciplinas/${idDisciplina}`, disciplina)
     await inserirDados({ [idDisciplina]: disciplina }, 'disciplinas')
 
     removerPopup()

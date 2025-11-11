@@ -177,17 +177,16 @@ img {
 }
 
 .botaoSuperiorLogin {
-    font-size: 1.2rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #b8b8b8;
-    padding: 1vw;
-    gap: 3vw;
+    background-color: #095752;
+    color: white;
+    padding: 0.5rem;
 }
 
 .botaoSuperiorLogin img {
-    width: 2rem;
+    width: 7rem;
 }
 
 .baixoLogin {
@@ -337,6 +336,7 @@ button {
 }
 
 .toolbarPopup {
+    cursor: pointer;
     border-top-left-radius: 5px;
     border-top-right-radius: 5px;
     justify-content: space-between;
@@ -350,6 +350,8 @@ button {
 }
 
 .toolbarPopup span {
+    font-size: 1.7rem;
+    cursor: pointer;
     color: white;
 }
 
@@ -367,9 +369,53 @@ button {
     width: 5vw;
 }
 
+.div-mensagem {
+    font-size: 1.2rem;
+    color: white;
+}
+
+.calendarios {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  padding: 10px;
+}
+
+.painel-agenda {
+    gap: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: start;
+    background-color: #e5e5e5;
+    padding: 0.5rem;
+    border-radius: 3px;
+}
+
+.painel-agenda img {
+    border-radius: 3px;
+    width: 4rem;
+}
+
 .botaoPopup label {
     cursor: pointer;
     color: white;
+}
+
+.topo-tabela {
+    border-bottom: 1px solid #666666;
+    min-height: 2vh;
+    display: flex;
+    align-items: start;
+    justify-content: start;
+    border-top-right-radius: 10px;
+    border-top-left-radius: 10px;
+    background-color: #b1b1b1;
+    gap: 2px;
+    width: 100%;
+}
+
+.topo-tabela span {
+    padding: 5px;
 }
 
 .blocoTabela {
@@ -406,8 +452,8 @@ button {
 }
 
 .tabela th {
+    font-weight: lighter;
     border: solid 1px #d2d2d2;
-    color: #222;
     padding: 8px;
 }
 
@@ -642,11 +688,10 @@ hr {
     align-items: center;
     justify-content: center;
     flex-direction: column;
-    border-radius: 3px;
-    box-shadow: 0px 0px 2px #222;
+    border-radius: 2px;
     color: white;
     background-color: #095752;
-    padding: 3px;
+    padding: 0 5px 0 5px;
 }
 
 .contorno-dias {
@@ -656,7 +701,7 @@ hr {
     justify-content: center;
     flex-direction: column;
     border-radius: 3px;
-    box-shadow: 0px 0px 2px #222;
+    border: solid 1px #939393;
     background-color: #ffffffa8;
     padding: 3px;
 }

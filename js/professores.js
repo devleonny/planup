@@ -4,11 +4,9 @@ const permissoes = ['coordenador', 'professor', 'administrativo', 'novo']
 
 async function telaUsuarios() {
 
-    mostrarMenus()
-
     const nomeBase = 'professores'
     const acumulado = `
-        ${modeloTabela({ colunas: ['Nome', 'Setor', 'Dias da Semana', 'Turnos', 'Disciplinas de Interesse', 'E-mail', 'Telefone', ''], base: nomeBase })}
+        ${modeloTabela({ colunas: ['', 'Nome', 'Setor', 'Dias da Semana', 'Turnos', 'Disciplinas de Interesse', 'E-mail', 'Telefone'], base: nomeBase })}
     `
     titulo.textContent = 'Gerenciar Professores'
     telaInterna.innerHTML = acumulado
@@ -45,6 +43,9 @@ async function criarLinhaUsuarios(usuario, dados) {
         `).join('')
 
     const tds = `
+        <td>
+           <img onclick="adicionarProfessor('${usuario}')" src="imagens/pesquisar.png" style="width: 2rem;">
+        </td>
         <td>${dados?.nome_completo || ''}</td>
         <td>${dados?.permissao || ''}</td>
         <td>
@@ -62,9 +63,6 @@ async function criarLinhaUsuarios(usuario, dados) {
         </td>
         <td>${dados?.email || ''}</td>
         <td>${dados?.telefone || ''}</td>
-        <td>
-           <img onclick="adicionarProfessor('${usuario}')" src="imagens/pesquisar.png" style="width: 2rem;">
-        </td>
     `
 
     const trExistente = document.getElementById(usuario)
@@ -181,12 +179,41 @@ async function adicionarProfessor(idProfessor) {
             
             <div style="${horizontal}; width: 100%; justify-content: space-between;">
                 <button onclick="salvarProfessor(${idProfessor ? `'${idProfessor}'` : ''})">Salvar</button>
+                ${idProfessor ? `<button style="background-color: #B12425;" onclick="removerProfessor('${idProfessor}')">Excluir</button>` : ''}
             </div>
 
         </div>
     `
 
     popup(acumulado, 'Gerenciar', true)
+
+}
+
+function removerProfessor(idProfessor) {
+    const acumulado = `
+        <div style="${horizontal}; background-color: #d2d2d2; padding: 1rem; gap: 1rem;">
+            <span>Você tem certeza?</span>
+            <button onclick="confirmarRemocaoProfessor('${idProfessor}')">Confirmar</button>
+        </div>
+    `
+
+    popup(acumulado, 'Remoção de Professor', true)
+}
+
+async function confirmarRemocaoProfessor(idProfessor) {
+
+    removerPopup()
+    removerPopup()
+    overlayAguarde()
+
+    const resposta = await alterarUsuarios({ usuario: idProfessor, campo: 'excluido', valor: new Date().getTime() })
+    if (resposta.err) return popup(mensagem(resposta.err), 'Alerta', true)
+
+    deletarDB(`dados_setores`, idProfessor)
+
+    await telaUsuarios()
+
+    removerOverlay()
 
 }
 

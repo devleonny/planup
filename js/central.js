@@ -20,6 +20,9 @@ document.addEventListener('keydown', function (event) {
 
 async function resetarBases() {
 
+    const acesso = JSON.parse(localStorage.getItem('acesso')) || null
+    if(!acesso) return
+
     overlayAguarde(true)
 
     const divMensagem = document.querySelector('.div-mensagem')
@@ -708,6 +711,9 @@ function telaLogin() {
 
                     <br>
                     <button onclick="acessoLogin()">Entrar</button>
+                    <br>
+
+                    <span onclick="recuperarSenha()" style="text-decoration: underline; cursor: pointer;">Esqueceu a senha?</span>
 
                 </div>
                 <div style="display: flex; justify-content: center; align-items: center; flex-direction: column;">
@@ -721,6 +727,126 @@ function telaLogin() {
     `
 
     tela.innerHTML = acumulado
+}
+
+function recuperarSenha() {
+
+    const acumulado = `
+        <div class="painel-recuperacao">
+            <span>Digite o Usuário</span>
+            <input name="identificador">
+            <hr>
+            <button onclick="solicitarCodigo()">Solicitar</button>
+        </div>
+    `
+
+    popup(acumulado, 'Recuperar acesso', true)
+
+}
+
+async function solicitarCodigo() {
+
+    const identificador = document.querySelector('[name="identificador"]')
+
+    if (!identificador) return
+
+    overlayAguarde()
+
+    const resposta = await recAC(identificador.value)
+
+    if (resposta.sucess) {
+
+        const acumulado = `
+            <div class="painel-recuperacao">
+                <span>Preencha com os números recebidos no e-mail</span>
+                <hr>
+                <div style="${horizontal}; gap: 0.5rem;">
+                    <input id="identificador" style="display: none;" value="${identificador.value}">
+                    <input id="codigo" placeholder="Código" class="camp-1" type="number">
+                    <input id="novaSenha" placeholder="Nova Senha" class="camp-1">
+                    <button onclick="salvarSenha()">Confirmar</button>
+                </div>
+            </div>
+        `
+        popup(acumulado, 'Informe o código')
+    } else {
+        popup(mensagem(resposta.mensagem || 'Falha na solicitação'), 'Alerta')
+    }
+
+}
+
+async function salvarSenha() {
+
+    overlayAguarde()
+
+    const identificador = document.getElementById('identificador').value
+    const novaSenha = document.getElementById('novaSenha').value
+    const codigo = document.getElementById('codigo').value
+
+    const resposta = await salvarNovaSenha({ identificador, novaSenha, codigo })
+
+    if (resposta.sucess) {
+        return popup(mensagem(resposta.mensagem), 'Alerta')
+    }
+
+    if (resposta.mensagem) popup(mensagem(resposta.mensagem), 'Alerta', true)
+
+}
+
+async function salvarNovaSenha({ identificador, novaSenha, codigo }) {
+
+    const url = `${api}/verificar-codigo`
+
+    try {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ identificador, novaSenha, codigo, servidor })
+        })
+
+        if (!response.ok) {
+            console.error(`Falha ao deletar: ${response.status} ${response.statusText}`)
+            const erroServidor = await response.text()
+            console.error(`Resposta do servidor:`, erroServidor)
+            throw new Error(`Erro HTTP ${response.status}`)
+        }
+
+        const data = await response.json()
+
+        return data
+
+    } catch (erro) {
+        return { mensagem: erro }
+    }
+
+}
+
+async function recAC(identificador) {
+
+    const url = `${api}/recuperar`
+
+    try {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ identificador, servidor })
+        })
+
+        if (!response.ok) {
+            console.error(`Falha ao deletar: ${response.status} ${response.statusText}`)
+            const erroServidor = await response.text()
+            console.error(`Resposta do servidor:`, erroServidor)
+            throw new Error(`Erro HTTP ${response.status}`)
+        }
+
+        const data = await response.json()
+
+        return data
+
+    } catch (erro) {
+        return { mensagem: erro }
+    }
+
 }
 
 // API

@@ -335,6 +335,15 @@ button {
     color: white;
 }
 
+.painel-recuperacao {
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
+    align-items: start;
+    padding: 2rem;
+    background-color: #d2d2d2;
+}
+
 .toolbarPopup {
     cursor: pointer;
     border-top-left-radius: 5px;
@@ -375,10 +384,10 @@ button {
 }
 
 .calendarios {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 15px;
-  padding: 10px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    padding: 10px;
 }
 
 .painel-agenda {
@@ -430,6 +439,7 @@ button {
 
 .recorteTabela {
     height: max-content;
+    max-height: 70vh;
     min-width: 100%;
     max-width: 80vw;
     overflow: auto;
@@ -791,10 +801,6 @@ screen and (min-aspect-ratio: 13/9) {
 
     .detalhes img {
         width: 3vw;
-    }
-
-    .recorteTabela {
-        max-width: 90vw;
     }
 
     .aguarde img {

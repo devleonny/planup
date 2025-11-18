@@ -12,7 +12,12 @@ let etapasProvisorias = {}
 let stream;
 let telaInterna = null
 let emAtualizacao = false
+let acesso = {}
 const voltarClientes = `<button style="background-color: #3131ab;" onclick="telaClientes()">Voltar</button>`
+const check = {
+    dtInicio: null,
+    dtTermino: null
+}
 
 document.addEventListener('keydown', function (event) {
     if (event.key === 'F8') resetarBases()
@@ -21,7 +26,7 @@ document.addEventListener('keydown', function (event) {
 async function resetarBases() {
 
     const acesso = JSON.parse(localStorage.getItem('acesso')) || null
-    if(!acesso) return
+    if (!acesso) return
 
     overlayAguarde(true)
 
@@ -81,7 +86,7 @@ const dtFormatada = (data) => {
     return `${dia}/${mes}/${ano}`
 }
 
-const modeloTabela = ({ colunas, base, btnExtras, body = 'body', removerPesquisa }) => {
+const modeloTabela = ({ colunas, base, linhas, btnExtras, body = 'body', removerPesquisa }) => {
 
     const ths = colunas
         .map(col => `<th>${col}</th>`).join('')
@@ -107,7 +112,7 @@ const modeloTabela = ({ colunas, base, btnExtras, body = 'body', removerPesquisa
         <div class="recorteTabela">
             <table class="tabela">
                 ${thead}
-                <tbody id="${body}"></tbody>
+                <tbody id="${body}">${linhas || ''}</tbody>
             </table>
         </div>
         <div class="rodapeTabela"></div>
@@ -328,8 +333,8 @@ function popup(elementoHTML, titulo, naoRemoverAnteriores) {
                 
                 <div class="toolbarPopup">
 
-                    <div style="width: 90%;">${titulo || 'Popup'}</div>
-                    <span style="width: 10%" onclick="removerPopup()">×</span>
+                    <div class="title">${titulo || 'Popup'}</div>
+                    <span class="close" onclick="removerPopup()">×</span>
 
                 </div>
                 
@@ -399,7 +404,7 @@ function overlayAguarde() {
 async function telaPrincipal() {
 
     toolbar.style.display = 'flex'
-    const acesso = JSON.parse(localStorage.getItem('acesso'))
+    acesso = JSON.parse(localStorage.getItem('acesso'))
 
     const menus = acesso.permissao !== 'professor'
         ? `
@@ -429,9 +434,24 @@ async function telaPrincipal() {
         </div>
 
         <div class="telaInterna">
+            
             <div class="plano-fundo">
-                <img src="imagens/logo.png" style="width: 30rem">
+                <div class="infos">
+                    <span>😊 Olá, ${inicialMaiuscula(acesso?.permissao || 'Usuário')}!</span>
+                    <hr>
+                    ${(await proximasAulas())}
+                    <hr>
+                    <div style="${horizontal}; gap: 1rem;">
+                        <img onclick="atalhoAgenda()" src="imagens/disciplina.png">
+                        <span>Ver Agenda Completa</span>
+                    </div>
+                </div>
+
+                <div class="info">
+                    ${await tabelaSemanalMini()}
+                </div>
             </div>
+
         </div>
     </div>
     `
@@ -442,6 +462,136 @@ async function telaPrincipal() {
     atualizarApp()
 
 }
+
+async function atalhoAgenda() {
+
+    await telaAgendas()
+
+    document.querySelector('[name="dtIni"]').value = check.dtInicio
+    document.querySelector('[name="dtFin"]').value = check.dtTermino
+    document.querySelector(`select option[id="${acesso.usuario}"]`).selected = true
+
+    await filtrarAgendas()
+
+}
+
+async function tabelaSemanalMini() {
+    const disciplinas = await recuperarDados('disciplinas')
+    const turmas = await recuperarDados('turmas')
+
+    const idProf = acesso?.usuario
+    const diasColunas = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab']
+
+    const grid = {
+        manha: { seg: '', ter: '', qua: '', qui: '', sex: '', sab: '' },
+        tarde: { seg: '', ter: '', qua: '', qui: '', sex: '', sab: '' },
+        noite: { seg: '', ter: '', qua: '', qui: '', sex: '', sab: '' }
+    }
+
+    const normalizarTurno = (t) => {
+        if (!t) return null
+        t = String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+        if (['manha','m','matutino','manha'].includes(t)) return 'manha'
+        if (['tarde','t','vespertino'].includes(t)) return 'tarde'
+        if (['noite','n','noturno'].includes(t)) return 'noite'
+        return null
+    }
+
+    for (const [idDisciplina, discip] of Object.entries(disciplinas || {})) {
+        for (const [idTurma, dados] of Object.entries(discip?.turmas || {})) {
+            if (dados.professor !== idProf) continue
+            if (!dados.dtInicio || !dados.dtTermino || !dados.dispDias) continue
+
+            const turnoKey = normalizarTurno(turmas?.[idTurma]?.turno)
+            if (!turnoKey) continue
+
+            for (const dia of diasColunas) {
+                if (dados.dispDias[dia]) {
+                    const nomeDisciplina = disciplinas?.[idDisciplina]?.nome || '--'
+                    const alvo = grid[turnoKey]
+                    if (!alvo) continue
+                    if (!alvo[dia]) alvo[dia] = nomeDisciplina
+                    else if (!alvo[dia].includes(nomeDisciplina)) alvo[dia] += `<br>${nomeDisciplina}`
+                }
+            }
+        }
+    }
+
+    const linhas = `
+        <tr>
+            <td>Manhã</td>${diasColunas.map(d => `<td style="text-align: left;">${grid.manha[d] || ''}</td>`).join('')}
+        </tr>
+        <tr>
+            <td>Tarde</td>${diasColunas.map(d => `<td style="text-align: left;">${grid.tarde[d] || ''}</td>`).join('')}
+        </tr>
+        <tr>
+            <td>Noite</td>${diasColunas.map(d => `<td style="text-align: left;">${grid.noite[d] || ''}</td>`).join('')}
+        </tr>
+    `
+
+    return modeloTabela({
+        removerPesquisa: true,
+        colunas: ['', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'],
+        linhas
+    })
+}
+
+
+async function proximasAulas() {
+    const disciplinas = await recuperarDados('disciplinas')
+    const turmas = await recuperarDados('turmas')
+
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+
+    const idProf = acesso?.usuario
+    const diasSemana = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab']
+
+    const proximas = []
+
+    for (const [idDisciplina, discip] of Object.entries(disciplinas || {})) {
+        for (const [idTurma, dados] of Object.entries(discip?.turmas || {})) {
+            if (dados.professor !== idProf) continue
+            if (!dados.dtInicio || !dados.dtTermino || !dados.dispDias) continue
+
+            const inicio = new Date(dados.dtInicio + "T00:00:00Z")
+            const fim = new Date(dados.dtTermino + "T00:00:00Z")
+
+            for (let d = new Date(inicio); d <= fim; d.setDate(d.getDate() + 1)) {
+                if (d < hoje) continue
+                const chave = diasSemana[d.getDay()]
+                if (!dados.dispDias[chave]) continue
+
+                const dataStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+                proximas.push({
+                    idDisciplina,
+                    idTurma,
+                    data: dataStr,
+                    turno: turmas?.[idTurma]?.turno || '--'
+                })
+            }
+        }
+    }
+
+    proximas.sort((a, b) => new Date(a.data) - new Date(b.data))
+
+    if (proximas.length > 0) {
+        check.dtInicio = proximas[0].data
+        check.dtTermino = proximas[proximas.length - 1].data
+    }
+
+    const lista = proximas
+        .map(aula => {
+            const nomeDisciplina = disciplinas?.[aula.idDisciplina]?.nome || '--'
+            const nomeTurma = turmas?.[aula.idTurma]?.nome || '--'
+            return `<span>${nomeTurma} <b>></b> ${nomeDisciplina} <b>></b> ${dtFormatada(aula.data)} <b>></b> ${aula?.turno || '--'}</span>`
+        }).join('')
+
+    return proximas.length !== 0 ? lista : `Sem aulas agendadas`
+
+}
+
 
 async function atualizarApp() {
 

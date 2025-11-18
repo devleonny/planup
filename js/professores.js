@@ -170,6 +170,8 @@ async function adicionarProfessor(idProfessor) {
                 <span>Disciplinas de Interesse</span>
                 <img onclick="painelDisciplinas('${idProfessor}')" src="imagens/turmas.png" style="width: 2.3rem;">
             </div>
+            ${modeloLivre('Formação', `<input name="formacao" value="${professor?.formacao || ''}">`)}
+            ${modeloLivre('Especialização', `<input name="especializacao" value="${professor?.especializacao || ''}">`)}
             ${modeloLivre('E-mail', `<input name="email" value="${professor?.email || ''}">`)}
             ${modeloLivre('Telefone', `<input name="contato" value="${professor?.telefone || ''}">`)}
 
@@ -238,19 +240,19 @@ async function salvarProfessor(usuario) {
         nome_completo: obVal('nome_completo'),
         email: obVal('email'),
         contato: obVal('contato'),
+        formacao: obVal('formacao'),
+        especializacao: obVal('especializacao'),
         dispDias,
         dispTurnos
     }
 
-    await Promise.all(
-        Object.entries(campos).map(([campo, valor]) =>
-            enviar(`professores/${usuario}/${campo}`, valor)
-        )
-    )
+    enviar(`professores/${usuario}`, campos)
 
     await inserirDados({ [usuario]: campos }, 'professores')
 
     removerPopup()
+
+    if (acesso.permissao == 'professor') return popup(mensagem('Atualizado', 'imagens/concluido.png'), 'PlanUP', true)
 
     const divProfs = document.getElementById('divProfs')
     if (divProfs) {

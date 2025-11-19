@@ -488,6 +488,7 @@ button {
 }
 
 .tabela thead {
+    z-index: 10;
     box-shadow: 0 1px 0 #ccc;
     top: 0;
     position: sticky;

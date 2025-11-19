@@ -101,6 +101,13 @@ async function planoAulas(idTurma) {
 
     const turma = await recuperarDado('turmas', idTurma)
 
+    const strDias = dias.map(dia => `
+        <div class="contorno-dias">
+            <input onchange="marcarDiasPadrao()" data-dia="${dia}" ${turma?.dispDias?.[dia] ? 'checked' : ''} type="checkbox">
+            <span>${dia}</span>
+        </div>
+        `).join('')
+
     const strTurnos = turnos.map(turno => `
         <div style="${vertical}; align-items: center;">
             <input onchange="selecionarTurno('${turno}')" name="turno" type="radio" ${turma?.turno == turno ? 'checked' : ''}>
@@ -111,6 +118,9 @@ async function planoAulas(idTurma) {
     const btnExtras = `
         <div id="planoAulas" class="contorno-dias" style="flex-direction: row; gap: 1rem;">
             ${strTurnos}
+        </div>
+        <div id="diasPadrao" style="${horizontal}; gap: 2px;">
+            ${strDias}
         </div>
         <div class="contorno-dias">
             <span>Nome da Turma</span>
@@ -128,6 +138,45 @@ async function planoAulas(idTurma) {
 
     for (const [idDisciplina, dados] of Object.entries(disciplinas)) {
         criarLinhaDisciplinaTurma(idDisciplina, dados, turma?.turno)
+    }
+
+}
+
+async function marcarDiasPadrao() {
+
+    const turma = await recuperarDado('turmas', idTurmaAtual)
+    const inputs = [...document.querySelectorAll('#diasPadrao input')]
+    const dispDias = Object.fromEntries(
+        inputs.map(input => [input.dataset.dia, input.checked])
+    )
+
+    turma.dispDias = dispDias
+
+    const disciplinas = await recuperarDados('disciplinas')
+
+    for (const [, dados] of Object.entries(disciplinas)) {
+        if (!dados?.turmas?.[idTurmaAtual]) continue
+        dados.turmas[idTurmaAtual].dispDias = dispDias
+    }
+
+    atualizarDiasSemana({ dispDias, idTurmaAtual })
+    await inserirDados(disciplinas, 'disciplinas')
+    await inserirDados({ [idTurmaAtual]: turma }, 'turmas')
+    await planoAulas(idTurmaAtual)
+}
+
+async function atualizarDiasSemana({ dispDias, idTurmaAtual }) {
+
+    const url = `${api}/dias-em-massa`
+    const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dispDias, idTurmaAtual })
+    })
+
+    if (!response.ok) {
+        const err = await response.json()
+        throw err
     }
 
 }
@@ -159,7 +208,7 @@ async function salvarDiasSemana(input, idDisciplina) {
 
     disciplina.turmas[idTurmaAtual].dispDias[dia] = input.checked
 
-    const resposta = await enviar(`disciplinas/${idDisciplina}/turmas/${idTurmaAtual}/dispDias/${dia}`, input.checked)
+    await enviar(`disciplinas/${idDisciplina}/turmas/${idTurmaAtual}/dispDias/${dia}`, input.checked)
 
     await inserirDados({ [idDisciplina]: disciplina }, 'disciplinas')
 
@@ -250,9 +299,18 @@ async function professoresDisponiveis(idDisciplina) {
     const disciplina = disciplinas?.[idDisciplina] || {}
     const professores = await recuperarDados('professores')
     const turmas = await recuperarDados('turmas')
+    const btnExtras = `
+        <div style="${horizontal}; justify-content: space-between; width: 100%;">   
+            <span style="padding: 5px; font-size: 1.5rem;">${disciplina.nome}</span>
+            <div style="${horizontal}; gap: 5px; padding: 0.5rem;">
+                <input type="radio" id="" name="professor" onchange="salvarProfessorDisciplina('${idDisciplina}')" style="width: 2rem; height: 2rem;">
+                <span>Sem professor</span>
+            </div>
+        </div>
+    `
     const turma = turmas[idTurmaAtual]
     const esquema = {
-        btnExtras: `<span style="padding: 5px; font-size: 1.5rem;">${disciplina.nome}</span>`,
+        btnExtras,
         removerPesquisa: true,
         body: 'body3',
         colunas: ['Editar', 'Professores', 'Turmas', 'Turnos', 'Dias escolhidos', 'Interesse nessa aula', 'Selecione']

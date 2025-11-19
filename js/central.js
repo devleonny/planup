@@ -86,7 +86,7 @@ const dtFormatada = (data) => {
     return `${dia}/${mes}/${ano}`
 }
 
-const modeloTabela = ({ colunas, base, linhas, btnExtras, body = 'body', removerPesquisa }) => {
+const modeloTabela = ({ colunas, funcao, linhas, btnExtras, body = 'body', removerPesquisa }) => {
 
     const ths = colunas
         .map(col => `<th>${col}</th>`).join('')
@@ -105,7 +105,7 @@ const modeloTabela = ({ colunas, base, linhas, btnExtras, body = 'body', remover
                         <img src="imagens/pesquisar2.png">
                     </div>`}
                 ${btnExtras || ''}
-                ${base ? `<img class="atualizar" src="imagens/atualizar.png" onclick="atualizarDados('${base}')">` : ''}
+                ${funcao ? `<img class="atualizar" src="imagens/atualizar.png" onclick="${funcao}">` : ''}
             </div>
             
         </div>

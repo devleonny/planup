@@ -2,10 +2,17 @@ async function telaDisciplinas() {
 
     mostrarMenus()
 
-    const btnExtras = `<button onclick="adicionarDisciplina()">Adicionar</button>`
+    const btnExtras = `
+    <button onclick="adicionarDisciplina()">Adicionar</button>
+
+    <span>Quantidade de Encontros</span>
+    
+    `
     const nomeBase = 'disciplinas'
     const acumulado = `
-        ${modeloTabela({ colunas: ['Nome', 'Manhã (4h)', 'Tarde (4h)', 'Noite (2h)', ''], base: nomeBase, btnExtras })}
+        ${modeloTabela({ 
+            colunas: ['Nome', 'Manhã', 'Tarde', 'Noite', ''],
+            btnExtras })}
     `
     titulo.textContent = 'Disciplinas'
     telaInterna.innerHTML = acumulado
@@ -58,7 +65,7 @@ async function adicionarDisciplina(idDisciplina) {
         </div>
     `
 
-    popup(acumulado, 'Gerenciar', true)
+    popup(acumulado, 'Quantidade de encontros', true)
 
 }
 

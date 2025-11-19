@@ -8,12 +8,14 @@ const esqT = {
 
 async function telaTurmas() {
 
-    mostrarMenus()
-
     const btn = `<button onclick="adicionarTurma()">Adicionar</button>`
     const nomeBase = 'turmas'
     const acumulado = `
-        ${modeloTabela({ colunas: ['Nome', 'Turno', 'Andamento', 'Disciplinas Cursadas', 'Plano de Aulas', ''], base: nomeBase, btnExtras: btn })}
+        ${modeloTabela({
+        colunas: ['Nome', 'Turno', 'Andamento', 'Disciplinas Cursadas', 'Plano de Aulas', ''],
+        funcao: `atualizarPlanoAulas()`,
+        btnExtras: btn
+    })}
     `
     titulo.textContent = 'Turmas'
     telaInterna.innerHTML = acumulado
@@ -25,10 +27,15 @@ async function telaTurmas() {
     for (const [idTurma, dados] of Object.entries(base).reverse()) {
 
         let contador = 0
-        for (const [idDisciplina, disciplina] of Object.entries(disciplinas)) {
+        for (const [, disciplina] of Object.entries(disciplinas)) {
             const turmas = disciplina?.turmas || {}
             const turma = turmas[idTurma]
             if (!turma) continue
+
+            if (turma.finalizado == 'S') {
+                contador++
+                continue
+            }
 
             const dt = turma.dtTermino
             if (!dt) continue
@@ -129,7 +136,10 @@ async function planoAulas(idTurma) {
         <button onclick="telaTurmas()">Voltar</button>
     `
     const acumulado = `
-        ${modeloTabela({ btnExtras, colunas: ['Disciplinas', 'Carga Horária', 'Dia da Semana', 'Início', 'Término', 'Professores'] })}
+        ${modeloTabela({
+        btnExtras,
+        colunas: ['Disciplinas', 'Encontros', 'Dia da Semana', 'Status', 'Início', 'Término', 'Professores']
+    })}
     `
     const planoAulas = document.getElementById('planoAulas')
     if (!planoAulas) telaInterna.innerHTML = acumulado
@@ -142,6 +152,16 @@ async function planoAulas(idTurma) {
 
 }
 
+async function atualizarPlanoAulas() {
+
+    await sincronizarDados('turmas')
+    await sincronizarDados('disciplinas')
+    await sincronizarDados('professores')
+
+    await telaTurmas()
+
+}
+
 async function marcarDiasPadrao() {
 
     const turma = await recuperarDado('turmas', idTurmaAtual)
@@ -151,6 +171,7 @@ async function marcarDiasPadrao() {
     )
 
     turma.dispDias = dispDias
+    enviar(`turmas/${idTurmaAtual}/dispDias`, dispDias)
 
     const disciplinas = await recuperarDados('disciplinas')
 
@@ -261,6 +282,9 @@ async function criarLinhaDisciplinaTurma(idDisciplina, dados, turno) {
         </div>
         `).join('')
 
+
+    const finalizado = discpTurma?.finalizado == 'S'
+
     const tds = `
         <td>${dados?.nome || ''}</td>
         <td>${dados?.[chave] || ''}</td>
@@ -270,14 +294,20 @@ async function criarLinhaDisciplinaTurma(idDisciplina, dados, turno) {
             </div>
         </td>
         <td>
+            <div style="${horizontal}; gap: 5px;">
+                <img onclick="finalizarCurso(this, '${idDisciplina}')" data-status="${discpTurma?.finalizado || 'N'}" src="imagens/${finalizado ? 'concluido' : 'cancel'}.png">
+                <span>Finalizado</span>
+            </div>
+        </td>
+        <td>
             <div style="${horizontal}; gap: 1rem;">
-                <img src="imagens/${discpTurma?.dtInicio ? 'concluido' : 'cancel'}.png" style="width: 2rem;">
+                <img src="imagens/${(finalizado || discpTurma?.dtInicio) ? 'concluido' : 'cancel'}.png" style="width: 2rem;">
                 <input type="date" onchange="atualizarDatas(this.value, 'dtInicio', '${idDisciplina}')" value="${discpTurma?.dtInicio || ''}">
             </div> 
         </td>
         <td>
             <div style="${horizontal}; gap: 1rem;">
-                <img src="imagens/${discpTurma?.dtTermino ? 'concluido' : 'cancel'}.png" style="width: 2rem;">
+                <img src="imagens/${(finalizado || discpTurma?.dtTermino) ? 'concluido' : 'cancel'}.png" style="width: 2rem;">
                 <input type="date" onchange="atualizarDatas(this.value, 'dtTermino', '${idDisciplina}')" value="${discpTurma?.dtTermino || ''}">
             </div> 
         </td>
@@ -292,6 +322,23 @@ async function criarLinhaDisciplinaTurma(idDisciplina, dados, turno) {
     const trExistente = document.getElementById(idDisciplina)
     if (trExistente) return trExistente.innerHTML = tds
     document.getElementById('body').insertAdjacentHTML('beforeend', `<tr id="${idDisciplina}">${tds}</tr>`)
+}
+
+async function finalizarCurso(img, idDisciplina) {
+
+    const disciplina = await recuperarDado('disciplinas', idDisciplina)
+
+    const status = img.dataset.status == 'S' ? 'N' : 'S'
+
+    disciplina.turmas ??= {}
+    disciplina.turmas[idTurmaAtual] ??= {}
+    disciplina.turmas[idTurmaAtual].finalizado = status
+
+    enviar(`disciplinas/${idDisciplina}/turmas/${idTurmaAtual}/finalizado`, status)
+
+    await inserirDados({ [idDisciplina]: disciplina }, 'disciplinas')
+    await planoAulas(idTurmaAtual)
+
 }
 
 async function professoresDisponiveis(idDisciplina) {
@@ -450,7 +497,6 @@ async function irParaTurma(idTurma) {
     await planoAulas(idTurma)
 
 }
-
 
 async function salvarProfessorDisciplina(idDisciplina) {
     const selecionado = document.querySelector('input[name="professor"]:checked')

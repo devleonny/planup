@@ -75,9 +75,9 @@ const modelo = (texto, valor, name) => `
     </div>
 `
 const modeloLivre = (texto, elemento) => `
-    <div style="${vertical}; padding: 10px;">
+    <div style="${vertical}; width: 100%; padding: 10px;">
         <span>${texto}</span>
-        <div style="width: 90%;">${elemento}</div>
+        <div>${elemento}</div>
     </div>
 `
 const dtFormatada = (data) => {
@@ -268,7 +268,7 @@ function salvarCadastro() {
 
     const camposCadastro = document.querySelector('.camposCadastro')
     const campos = camposCadastro.querySelectorAll('input')
-    const nome_completo = campos[0].value
+    const nome_completo = capitalizarFrase(campos[0].value)
     const usuario = campos[1].value
     const senha = campos[2].value
     const email = campos[3].value
@@ -322,6 +322,14 @@ function salvarCadastro() {
 
     }
 
+}
+
+function capitalizarFrase(texto) {
+    return texto
+        .toLowerCase()
+        .split(' ')
+        .map(p => p.charAt(0).toUpperCase() + p.slice(1))
+        .join(' ')
 }
 
 function popup(elementoHTML, titulo, naoRemoverAnteriores) {
@@ -401,7 +409,7 @@ function overlayAguarde() {
 
 }
 
-async function telaPrincipal() {
+async function telaPrincipal(ignorar) {
 
     toolbar.style.display = 'flex'
     acesso = JSON.parse(localStorage.getItem('acesso'))
@@ -426,7 +434,7 @@ async function telaPrincipal() {
             </div>
 
             ${btn('atualizar', 'Atualizar', 'atualizarApp()')}
-            ${btn('home', 'Página Inicial', 'telaPrincipal()')}
+            ${btn('home', 'Página Inicial', 'telaPrincipal(true)')}
             ${btn('agenda', 'Agenda', 'telaAgendas()')}
             ${menus}
             ${btn('sair', 'Desconectar', 'deslogar()')}
@@ -459,7 +467,7 @@ async function telaPrincipal() {
     tela.innerHTML = acumulado
     telaInterna = document.querySelector('.telaInterna')
 
-    atualizarApp()
+    if (!ignorar) atualizarApp()
 
 }
 
@@ -491,9 +499,9 @@ async function tabelaSemanalMini() {
     const normalizarTurno = (t) => {
         if (!t) return null
         t = String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
-        if (['manha','m','matutino','manha'].includes(t)) return 'manha'
-        if (['tarde','t','vespertino'].includes(t)) return 'tarde'
-        if (['noite','n','noturno'].includes(t)) return 'noite'
+        if (['manha', 'm', 'matutino', 'manha'].includes(t)) return 'manha'
+        if (['tarde', 't', 'vespertino'].includes(t)) return 'tarde'
+        if (['noite', 'n', 'noturno'].includes(t)) return 'noite'
         return null
     }
 
@@ -591,7 +599,6 @@ async function proximasAulas() {
     return proximas.length !== 0 ? lista : `Sem aulas agendadas`
 
 }
-
 
 async function atualizarApp() {
 

@@ -143,51 +143,47 @@ async function adicionarProfessor(idProfessor) {
         `).join('')
 
 
-    const exclusivo = `
-        <hr>
-        ${modeloLivre('Permissão',
-        `<select onchange="configuracoes('${idProfessor}', 'permissao', this.value)">
-                ${permissoes.map(op => `<option ${professor?.permissao == op ? 'selected' : ''}>${op}</option>`).join('')}
-            </select>`)
-        }`
-
-    const acumulado = `
-        <div class="formulario">
-            
-            ${modeloLivre('Nome', `<input name="nome_completo" value="${professor?.nome_completo || ''}">`)}
-            ${modeloLivre('Disponibilidade', `
-                <div style="${horizontal}; gap: 3px;">
+    const linhas = [
+        { texto: 'Nome', elemento: `<input oninput="corrigirNome(this)" name="nome_completo" value="${professor?.nome_completo || ''}">` },
+        {
+            texto: 'Disponibilidade', elemento: `
+                <div class="dias">
                     ${strDias}
                 </div>
-                `)}
-            ${modeloLivre('Turnos', `
-                <div style="${horizontal}; gap: 3px;">
+            `},
+        {
+            texto: 'Turnos', elemento: `
+                <div class="dias">
                     ${strTurnos}
                 </div>
-                `)}
-            
-            <div style="${horizontal}; gap: 1rem;">
-                <span>Disciplinas de Interesse</span>
-                <img onclick="painelDisciplinas('${idProfessor}')" src="imagens/turmas.png" style="width: 2.3rem;">
-            </div>
-            ${modeloLivre('Formação', `<input name="formacao" value="${professor?.formacao || ''}">`)}
-            ${modeloLivre('Especialização', `<input name="especializacao" value="${professor?.especializacao || ''}">`)}
-            ${modeloLivre('E-mail', `<input name="email" value="${professor?.email || ''}">`)}
-            ${modeloLivre('Telefone', `<input name="contato" value="${professor?.telefone || ''}">`)}
+            `},
+        { texto: 'Formação', elemento: `<input name="formacao" value="${professor?.formacao || ''}">` },
+        { texto: 'Especialização', elemento: `<input name="especializacao" value="${professor?.especializacao || ''}">` },
+        { texto: 'E-mail', elemento: `<input name="email" value="${professor?.email || ''}">` },
+        { texto: 'Telefone', elemento: `<input name="telefone" value="${professor?.telefone || ''}">` },
+    ]
 
-            ${acesso?.permissao == 'coordenador' ? exclusivo : ''}    
+    if (acesso?.permissao == 'coordenador') linhas.push({
+        texto: 'Permissão',
+        elemento: `
+            <select onchange="configuracoes('${idProfessor}', 'permissao', this.value)">
+                ${permissoes.map(op => `<option ${professor?.permissao == op ? 'selected' : ''}>${op}</option>`).join('')}
+            </select>
+        `
+    })
 
-            <hr>
-            
-            <div style="${horizontal}; width: 100%; justify-content: space-between;">
-                <button onclick="salvarProfessor(${idProfessor ? `'${idProfessor}'` : ''})">Salvar</button>
-                ${idProfessor ? `<button style="background-color: #B12425;" onclick="removerProfessor('${idProfessor}')">Excluir</button>` : ''}
-            </div>
+    const botoes = [
+        { texto: 'Salvar', img: 'concluido', funcao: `salvarProfessor(${idProfessor ? `'${idProfessor}'` : ''})` }
+    ]
 
-        </div>
-    `
+    if (idProfessor) botoes.push({
+        texto: 'Excluir',
+        img: 'cancel',
+        funcao: `removerProfessor('${idProfessor}')`
+    })
 
-    popup(acumulado, 'Gerenciar', true)
+    const form = new formulario({ linhas, botoes, titulo: 'Gerenciar Professor' })
+    form.abrirFormulario()
 
 }
 
@@ -219,6 +215,12 @@ async function confirmarRemocaoProfessor(idProfessor) {
 
 }
 
+function corrigirNome(input) {
+
+    input.value = capitalizarFrase(input.value)
+
+}
+
 async function salvarProfessor(usuario) {
 
     overlayAguarde()
@@ -236,16 +238,23 @@ async function salvarProfessor(usuario) {
         dispTurnos[turno] = input.checked
     }
 
+    const nome_completo = obVal('nome_completo')
+    const email = obVal('email')
+    const telefone = obVal('telefone')
+
     const campos = {
-        nome_completo: obVal('nome_completo'),
-        email: obVal('email'),
-        contato: obVal('contato'),
+        nome_completo,
+        email,
+        telefone,
         formacao: obVal('formacao'),
         especializacao: obVal('especializacao'),
         dispDias,
         dispTurnos
     }
 
+    alterarUsuarios({ usuario, campo: 'nome_completo', valor: nome_completo })
+    alterarUsuarios({ usuario, campo: 'email', valor: email })
+    alterarUsuarios({ usuario, campo: 'telefone', valor: telefone })
     enviar(`professores/${usuario}`, campos)
 
     await inserirDados({ [usuario]: campos }, 'professores')

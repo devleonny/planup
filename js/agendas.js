@@ -21,6 +21,7 @@ async function telaAgendas() {
     const disciplinas = await recuperarDados('disciplinas')
 
     const opcProf = Object.entries(professores)
+        .sort((a, b) => a[1].nome_completo.localeCompare(b[1].nome_completo))
         .map(([idProfessor, professor]) => `<option id="${idProfessor}">${professor.nome_completo}</option>`)
         .join('')
 
@@ -55,6 +56,7 @@ async function filtrarAgendas() {
     overlayAguarde()
 
     const disciplinas = await recuperarDados('disciplinas')
+    const turmas = await recuperarDados('turmas')
 
     const el = (name) => document.querySelector(`[name="${name}"]`)
     const prof = el('prof')
@@ -78,7 +80,9 @@ async function filtrarAgendas() {
             if (!dados.dtInicio || !dados.dtTermino || !dados.dispDias) continue
             if (idProf && dados.professor !== idProf) continue
 
-            if (!datas[idDisciplina]) datas[idDisciplina] = []
+            datas[idDisciplina] ??= {}
+            datas[idDisciplina].lista ??= []
+            datas[idDisciplina].idTurma = turmas?.[idTurma]?.nome || '--'
 
             const inicio = new Date(dados.dtInicio + "T00:00:00Z")
             const fim = new Date(dados.dtTermino + "T00:00:00Z")
@@ -93,7 +97,7 @@ async function filtrarAgendas() {
 
                 if (dados.dispDias[chaveDia]) {
                     const dataStr = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
-                    datas[idDisciplina].push(dataStr)
+                    datas[idDisciplina].lista.push(dataStr)
                 }
             }
         }
@@ -105,6 +109,7 @@ async function filtrarAgendas() {
 
 
 async function criarCalendario(datas) {
+
     const ths = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
         .map(sem => `<th>${sem}</th>`).join('')
 
@@ -114,8 +119,8 @@ async function criarCalendario(datas) {
     for (const cod in datas) cores[cod] = disciplinas?.[cod]?.cor || randomColor()
 
     const mapaDatas = {}
-    for (const [cod, lista] of Object.entries(datas)) {
-        for (const dt of lista) {
+    for (const [cod, obj] of Object.entries(datas)) {
+        for (const dt of obj.lista) {
             if (!mapaDatas[dt]) mapaDatas[dt] = []
             if (!mapaDatas[dt].includes(cod)) mapaDatas[dt].push(cod)
         }
@@ -152,19 +157,31 @@ async function criarCalendario(datas) {
                     .map(cod => disciplinas?.[cod]?.nome || '(Sem nome)')
                     .join(' / ')
 
-                if (disciplinasDia.length === 1) {
-                    estilo = `style="background:${cores[disciplinasDia[0]]}; color:#fff; font-weight:600"`
-                } else {
-                    const n = disciplinasDia.length
-                    const gradientes = disciplinasDia
-                        .map((cod, idx) => {
-                            const start = (idx * 100) / n
-                            const end = ((idx + 1) * 100) / n
-                            return `${cores[cod]} ${start}% ${end}%`
+                if (disciplinasDia.length) {
+                    title = disciplinasDia
+                        .map(cod => {
+                            const disc = disciplinas?.[cod]
+                            const nome = disc?.nome || '(Sem nome)'
+                            const turma = datas[cod]?.idTurma || '(Sem turma)'
+                            return `${turma} > ${nome}`
                         })
-                        .join(', ')
-                    estilo = `style="background: linear-gradient(90deg, ${gradientes}); color:#fff; font-weight:600"`
+                        .join(' / ')
+
+                    if (disciplinasDia.length === 1) {
+                        estilo = `style="background:${cores[disciplinasDia[0]]}; color:#fff; font-weight:600"`
+                    } else {
+                        const n = disciplinasDia.length
+                        const gradientes = disciplinasDia
+                            .map((cod, idx) => {
+                                const start = (idx * 100) / n
+                                const end = ((idx + 1) * 100) / n
+                                return `${cores[cod]} ${start}% ${end}%`
+                            })
+                            .join(', ')
+                        estilo = `style="background: linear-gradient(90deg, ${gradientes}); color:#fff; font-weight:600"`
+                    }
                 }
+
             }
 
             const sem = new Date(Date.UTC(ano, mes - 1, i)).getUTCDay()

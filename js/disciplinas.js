@@ -1,11 +1,9 @@
 async function telaDisciplinas() {
 
-    mostrarMenus()
-
     const btnExtras = `
     <button onclick="adicionarDisciplina()">Adicionar</button>
 
-    <span>Quantidade de Encontros</span>
+    <img src="imagens/atualizar.png" style="width: 3rem;" onclick="atualizarDisciplinas()">
     
     `
     const nomeBase = 'disciplinas'
@@ -22,6 +20,13 @@ async function telaDisciplinas() {
         criarLinhaDisciplinas(id, dados)
     }
 
+}
+
+async function atualizarDisciplinas() {
+
+    await sincronizarDados('disciplinas')
+    await telaDisciplinas()
+    
 }
 
 function criarLinhaDisciplinas(idDisciplina, dados) {
